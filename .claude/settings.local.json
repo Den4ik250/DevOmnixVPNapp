@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter --version)",
+      "Bash(git --version)",
+      "Bash(winget --version)",
+      "Bash(where android-studio *)",
+      "Read(//c/Program Files/Android/**)",
+      "Bash(java --version)",
+      "PowerShell(flutter *)",
+      "PowerShell(Test-Path *)"
+    ]
+  }
+}
