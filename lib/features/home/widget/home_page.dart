@@ -8,6 +8,7 @@ import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/home/widget/connection_button.dart';
+import 'package:hiddify/features/home/widget/promo_banner.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/profile/widget/profile_tile.dart';
 import 'package:hiddify/features/home/widget/speed_indicator.dart';
@@ -113,7 +114,7 @@ class HomePage extends HookConsumerWidget {
                     // AsyncData(value: final profile?) =>
                     MultiSliver(
                       children: [
-                        // const Gap(100),
+                        const PromoBanner(),
                         switch (activeProfile) {
                           AsyncData(value: final profile?) => ProfileTile(
                             profile: profile,

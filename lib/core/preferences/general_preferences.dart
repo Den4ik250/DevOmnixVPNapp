@@ -110,6 +110,12 @@ abstract class Preferences {
 
   static final jwtToken = PreferencesNotifier.create<String, String>("jwt_token", "");
 
+  static final deviceId = PreferencesNotifier.create<String, String>("device_id", "");
+
+  static final promoUsed = PreferencesNotifier.create<bool, bool>("promo_used", false);
+
+  static final hasActiveSub = PreferencesNotifier.create<bool, bool>("has_active_sub", false);
+
   static final actionAtClose = PreferencesNotifier.create<ActionsAtClosing, String>(
     "action_at_close",
     ActionsAtClosing.ask,

@@ -2,20 +2,39 @@ import 'package:dio/dio.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/auth/data/auth_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 
-enum AuthStatus { idle, loading, waitingForBot, success, error }
+enum AuthStatus { loading, ready, phoneEntry, smsPending, smsVerifying, success, error }
 
 class AuthState {
   const AuthState({
-    this.status = AuthStatus.idle,
+    this.status = AuthStatus.loading,
+    this.promoUsed = false,
+    this.hasActiveSub = false,
+    this.phone,
     this.errorMessage,
-    this.botUrl,
   });
 
   final AuthStatus status;
+  final bool promoUsed;
+  final bool hasActiveSub;
+  final String? phone;
   final String? errorMessage;
-  final String? botUrl;
+
+  AuthState copyWith({
+    AuthStatus? status,
+    bool? promoUsed,
+    bool? hasActiveSub,
+    String? phone,
+    String? errorMessage,
+  }) =>
+      AuthState(
+        status: status ?? this.status,
+        promoUsed: promoUsed ?? this.promoUsed,
+        hasActiveSub: hasActiveSub ?? this.hasActiveSub,
+        phone: phone ?? this.phone,
+        errorMessage: errorMessage ?? this.errorMessage,
+      );
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((_) => AuthRepository(Dio()));
@@ -25,60 +44,88 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   final Ref _ref;
 
-  Future<void> startLogin() async {
+  /// Called once on app startup — silently authenticates via device_id.
+  Future<void> init() async {
     state = const AuthState(status: AuthStatus.loading);
     try {
+      final deviceId = await _ensureDeviceId();
       final repo = _ref.read(authRepositoryProvider);
-      final result = await repo.requestLogin();
-      state = AuthState(status: AuthStatus.waitingForBot, botUrl: result.botUrl);
-      await launchUrl(Uri.parse(result.botUrl), mode: LaunchMode.externalApplication);
-      _pollForJwt(result.loginToken);
-    } catch (e) {
-      final msg = e is DioException
-          ? (e.response?.data?['detail'] ?? e.message)
-          : e.toString();
+      final result = await repo.deviceLogin(deviceId);
+      await _applyResult(result);
       state = AuthState(
-        status: AuthStatus.error,
-        errorMessage: msg?.toString() ?? 'Ошибка соединения',
+        status: AuthStatus.ready,
+        promoUsed: result.promoUsed,
+        hasActiveSub: result.hasActiveSub,
       );
+    } catch (e) {
+      // Allow offline mode — treat as no active sub
+      await _ref.read(Preferences.authCompleted.notifier).update(true);
+      state = const AuthState(status: AuthStatus.ready, hasActiveSub: false);
     }
   }
 
-  Future<void> _pollForJwt(String loginToken) async {
-    for (var i = 0; i < 150; i++) {
-      await Future.delayed(const Duration(seconds: 2));
-      if (!mounted) return;
-      if (state.status != AuthStatus.waitingForBot) return;
-      try {
-        final repo = _ref.read(authRepositoryProvider);
-        final jwt = await repo.checkLogin(loginToken);
-        if (jwt != null) {
-          await _ref.read(Preferences.jwtToken.notifier).update(jwt);
-          await _ref.read(Preferences.authCompleted.notifier).update(true);
-          if (mounted) state = const AuthState(status: AuthStatus.success);
-          return;
-        }
-      } catch (e) {
-        if (e is DioException && (e.response?.statusCode == 404)) {
-          if (mounted) {
-            state = const AuthState(
-              status: AuthStatus.error,
-              errorMessage: 'Время ожидания истекло. Попробуйте снова.',
-            );
-          }
-          return;
-        }
-      }
-    }
-    if (mounted) {
-      state = const AuthState(
-        status: AuthStatus.error,
-        errorMessage: 'Время ожидания истекло. Попробуйте снова.',
-      );
+  /// Start phone verification flow.
+  Future<void> sendSmsCode(String phone) async {
+    state = state.copyWith(status: AuthStatus.smsPending, phone: phone, errorMessage: null);
+    try {
+      final jwt = _ref.read(Preferences.jwtToken);
+      final repo = _ref.read(authRepositoryProvider);
+      await repo.sendSmsCode(phone, jwt);
+      state = state.copyWith(status: AuthStatus.smsVerifying);
+    } catch (e) {
+      final msg = _extractError(e);
+      state = state.copyWith(status: AuthStatus.phoneEntry, errorMessage: msg);
     }
   }
 
-  void reset() => state = const AuthState();
+  /// Verify SMS code and activate promo.
+  Future<void> verifySmsCode(String code) async {
+    final phone = state.phone;
+    if (phone == null) return;
+    state = state.copyWith(status: AuthStatus.smsPending, errorMessage: null);
+    try {
+      final jwt = _ref.read(Preferences.jwtToken);
+      final repo = _ref.read(authRepositoryProvider);
+      final result = await repo.verifySmsCode(phone, code, jwt);
+      await _applyResult(result);
+      state = AuthState(
+        status: AuthStatus.success,
+        promoUsed: result.promoUsed,
+        hasActiveSub: result.hasActiveSub,
+      );
+    } catch (e) {
+      final msg = _extractError(e);
+      state = state.copyWith(status: AuthStatus.smsVerifying, errorMessage: msg);
+    }
+  }
+
+  void startPhoneEntry() => state = state.copyWith(status: AuthStatus.phoneEntry, errorMessage: null);
+
+  void backToPhoneEntry() => state = state.copyWith(status: AuthStatus.phoneEntry, errorMessage: null);
+
+  Future<String> _ensureDeviceId() async {
+    var id = _ref.read(Preferences.deviceId);
+    if (id.isEmpty) {
+      id = const Uuid().v4();
+      await _ref.read(Preferences.deviceId.notifier).update(id);
+    }
+    return id;
+  }
+
+  Future<void> _applyResult(AuthResult result) async {
+    await _ref.read(Preferences.jwtToken.notifier).update(result.jwt);
+    await _ref.read(Preferences.authCompleted.notifier).update(true);
+    await _ref.read(Preferences.promoUsed.notifier).update(result.promoUsed);
+    await _ref.read(Preferences.hasActiveSub.notifier).update(result.hasActiveSub);
+  }
+
+  String _extractError(Object e) {
+    if (e is DioException) {
+      final detail = e.response?.data?['detail'];
+      return detail?.toString() ?? e.message ?? 'Ошибка соединения';
+    }
+    return e.toString();
+  }
 }
 
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>(

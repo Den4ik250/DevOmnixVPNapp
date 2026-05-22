@@ -7,6 +7,7 @@ import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.
 import 'package:hiddify/core/router/go_router/helper/custom_transition.dart';
 import 'package:hiddify/core/router/go_router/refresh_listenable.dart';
 import 'package:hiddify/features/about/widget/about_page.dart';
+import 'package:hiddify/features/auth/notifier/auth_notifier.dart';
 import 'package:hiddify/features/auth/widget/auth_page.dart';
 import 'package:hiddify/features/connect/widget/connect_page.dart';
 import 'package:hiddify/features/faq/widget/faq_page.dart';
@@ -60,8 +61,6 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
   @override
   RoutingConfig build() {
     final isMobileBreakpoint = ref.watch(isMobileBreakpointProvider);
-    // Watch these so the routing config rebuilds (and redirect re-runs) when they change.
-    final authCompleted = ref.watch(Preferences.authCompleted);
     final introCompleted = ref.watch(Preferences.introCompleted);
     final bool showProfilesAction;
     if (isMobileBreakpoint == true) {
@@ -70,10 +69,19 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
       showProfilesAction = ref.watch(hasAnyProfileProvider).value ?? false;
     }
     if (isMobileBreakpoint == null) return loadingConfig;
+
+    // Trigger silent device auth once when notifier is still in initial loading state
+    if (ref.read(authNotifierProvider).status == AuthStatus.loading) {
+      Future.microtask(() {
+        if (ref.read(authNotifierProvider).status == AuthStatus.loading) {
+          ref.read(authNotifierProvider.notifier).init();
+        }
+      });
+    }
+
     return RoutingConfig(
       redirect: (context, state) {
         final isIntro = state.matchedLocation == '/intro';
-        final isAuth = state.matchedLocation == '/auth';
         // fix path-parameters for deep link
         String? url;
         if (LinkParser.protocols.contains(state.uri.scheme)) {
@@ -92,10 +100,6 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
             WidgetsBinding.instance.addPostFrameCallback(
               (_) => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(url: url),
             );
-          return authCompleted ? '/home' : '/auth';
-        } else if (!authCompleted && !isAuth) {
-          return '/auth';
-        } else if (isAuth && authCompleted) {
           return '/home';
         } else if (url != null) {
           WidgetsBinding.instance.addPostFrameCallback(
