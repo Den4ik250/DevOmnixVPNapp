@@ -8,7 +8,26 @@
       "Read(//c/Program Files/Android/**)",
       "Bash(java --version)",
       "PowerShell(flutter *)",
-      "PowerShell(Test-Path *)"
+      "PowerShell(Test-Path *)",
+      "PowerShell(Select-String *)",
+      "PowerShell(flutter doctor *)",
+      "PowerShell(Get-WmiObject *)",
+      "PowerShell($env:ANDROID_HOME = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\"; $sdkmanager = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\cmdline-tools\\\\latest\\\\bin\\\\sdkmanager.bat\"; \"y\" | & $sdkmanager \"system-images;android-34;google_apis;x86_64\" --sdk_root=\"$env:LOCALAPPDATA\\\\Android\\\\Sdk\" 2>&1 | Select-Object -Last 5)",
+      "PowerShell($env:ANDROID_HOME = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\"; $sdkmanager = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\cmdline-tools\\\\latest\\\\bin\\\\sdkmanager.bat\"; & $sdkmanager --list_installed 2>&1 | Select-String \"system-images\")",
+      "PowerShell($env:ANDROID_HOME = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\"; $avdmanager = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\cmdline-tools\\\\latest\\\\bin\\\\avdmanager.bat\"; \"no\" | & $avdmanager create avd --name \"Pixel6_API34\" --package \"system-images;android-34;google_apis;x86_64\" --device \"pixel_6\" --force 2>&1)",
+      "PowerShell(flutter emulators *)",
+      "PowerShell(adb devices *)",
+      "PowerShell(adb *)",
+      "PowerShell(flutter run *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Select-String \"C:\\\\Users\\\\user\\\\StudioProjects\\\\vpn-app\\\\lib\\\\features\\\\home\\\\widget\\\\connection_button.dart\" -Pattern \"font_awesome\" | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(Get-Content \"C:\\\\Users\\\\user\\\\StudioProjects\\\\vpn-app\\\\android\\\\app\\\\build.gradle\" | Select-String \"libbox|hiddify.core|aar|maven|implementation\" | Select-Object -First 20 | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(Get-Content \"C:\\\\Users\\\\user\\\\StudioProjects\\\\vpn-app\\\\Makefile\" | Select-String \"android-libs|CORE_URL|aar|hiddify-lib\" | ForEach-Object { $_.Line })",
+      "PowerShell(Get-Item *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\user\\\\StudioProjects\\\\DevOmnixVPNapp\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)"
     ]
   }
 }
