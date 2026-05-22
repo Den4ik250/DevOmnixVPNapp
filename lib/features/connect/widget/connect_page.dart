@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/features/backend/backend_service.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -18,6 +19,7 @@ class ConnectPage extends HookConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Подключение'),
+          leading: BackButton(onPressed: () => context.canPop() ? context.pop() : context.goNamed('home')),
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.bolt_rounded), text: 'Быстро'),
