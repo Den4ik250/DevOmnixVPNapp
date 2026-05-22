@@ -272,9 +272,7 @@ class _InviteLinkCard extends StatelessWidget {
             ),
             const Gap(12),
             FilledButton.icon(
-              onPressed: () => SharePlus.instance.share(
-                ShareParams(text: 'Присоединяйся к DevOmnix VPN! $inviteUrl'),
-              ),
+              onPressed: () => Share.share('Присоединяйся к DevOmnix VPN!\n$inviteUrl'),
               icon: const Icon(Icons.share),
               label: const Text('Поделиться'),
               style: FilledButton.styleFrom(

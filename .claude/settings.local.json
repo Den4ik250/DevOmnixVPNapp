@@ -27,7 +27,13 @@
       "PowerShell(Get-Item *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\user\\\\StudioProjects\\\\DevOmnixVPNapp\" -Recurse -Directory)",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(Sort-Object)"
+      "Bash(Sort-Object)",
+      "Bash(flutter build *)",
+      "Bash(flutter devices *)",
+      "Bash(flutter install *)",
+      "Bash(adb -s emulator-5554 install -r \"build\\\\app\\\\outputs\\\\flutter-apk\\\\app-debug.apk\")",
+      "PowerShell(pip install *)",
+      "PowerShell(python -c \"import cairosvg; print\\('cairosvg OK'\\)\" 2>&1)"
     ]
   }
 }
