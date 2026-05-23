@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/features/backend/backend_api_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ class PlansPage extends ConsumerStatefulWidget {
 
 class _PlansPageState extends ConsumerState<PlansPage> {
   final Map<String, int> _selectedMonths = {};
+  bool _paying = false;
 
   @override
   Widget build(BuildContext context) {
@@ -105,37 +107,96 @@ class _PlansPageState extends ConsumerState<PlansPage> {
         title: const Text('Тарифы'),
         centerTitle: true,
       ),
-      body: plansAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48),
-              const Gap(16),
-              Text('Не удалось загрузить тарифы', style: Theme.of(context).textTheme.titleMedium),
-              const Gap(8),
-              FilledButton.tonal(
-                onPressed: () => ref.invalidate(_plansProvider),
-                child: const Text('Повторить'),
+      body: Stack(
+        children: [
+          plansAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, size: 48),
+                  const Gap(16),
+                  Text('Не удалось загрузить тарифы', style: Theme.of(context).textTheme.titleMedium),
+                  const Gap(8),
+                  FilledButton.tonal(
+                    onPressed: () => ref.invalidate(_plansProvider),
+                    child: const Text('Повторить'),
+                  ),
+                ],
               ),
-            ],
+            ),
+            data: (plans) => ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: plans.length,
+              separatorBuilder: (_, __) => const Gap(12),
+              itemBuilder: (context, i) {
+                return _PlanCard(
+                  plan: plans[i],
+                  selectedMonths: _selectedMonths[plans[i].key] ?? 1,
+                  onMonthsChanged: (m) => setState(() => _selectedMonths[plans[i].key] = m),
+                  onBuy: (plan, months) => _handleBuy(plan, months),
+                ).animate().fadeIn(delay: (80 * i).ms).slideY(begin: .1, curve: Curves.easeOut);
+              },
+            ),
           ),
-        ),
-        data: (plans) => ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: plans.length,
-          separatorBuilder: (_, __) => const Gap(12),
-          itemBuilder: (context, i) {
-            return _PlanCard(
-              plan: plans[i],
-              selectedMonths: _selectedMonths[plans[i].key] ?? 1,
-              onMonthsChanged: (m) => setState(() => _selectedMonths[plans[i].key] = m),
-            ).animate().fadeIn(delay: (80 * i).ms).slideY(begin: .1, curve: Curves.easeOut);
-          },
-        ),
+          if (_paying)
+            const ColoredBox(
+              color: Color(0x88000000),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+        ],
       ),
     );
+  }
+
+  Future<void> _handleBuy(_Plan plan, int months) async {
+    if (_paying) return;
+    setState(() => _paying = true);
+    try {
+      final dio = ref.read(backendDioProvider);
+      final resp = await dio.post('/payments/create', data: {
+        'plan': plan.key,
+        'months': months,
+        'provider': 'lava',
+      });
+      final data = resp.data as Map<String, dynamic>;
+
+      if (!mounted) return;
+      if (data['status'] == 'activated') {
+        // Wallet covered full price — subscription is active now
+        await showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Подписка активирована'),
+            content: Text('Тариф «${plan.name}» активен. Подключитесь через вкладку «Профили».'),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отлично'))],
+          ),
+        );
+      } else if (data['pay_url'] != null) {
+        final uri = Uri.parse(data['pay_url'] as String);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final msg = _extractError(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Theme.of(context).colorScheme.error),
+      );
+    } finally {
+      if (mounted) setState(() => _paying = false);
+    }
+  }
+
+  String _extractError(Object e) {
+    try {
+      // DioException has response.data
+      final data = (e as dynamic).response?.data;
+      if (data is Map && data['detail'] != null) return data['detail'].toString();
+    } catch (_) {}
+    return 'Ошибка соединения с сервером';
   }
 }
 
@@ -146,11 +207,13 @@ class _PlanCard extends StatelessWidget {
     required this.plan,
     required this.selectedMonths,
     required this.onMonthsChanged,
+    required this.onBuy,
   });
 
   final _Plan plan;
   final int selectedMonths;
   final ValueChanged<int> onMonthsChanged;
+  final void Function(_Plan plan, int months) onBuy;
 
   @override
   Widget build(BuildContext context) {
@@ -260,7 +323,7 @@ class _PlanCard extends StatelessWidget {
                     ],
                   ),
                   FilledButton(
-                    onPressed: () => _onBuy(context),
+                    onPressed: () => onBuy(plan, selectedMonths),
                     style: FilledButton.styleFrom(
                       backgroundColor: color,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -275,7 +338,7 @@ class _PlanCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () => _onBuy(context),
+                  onPressed: () => onBuy(plan, 0),
                   style: FilledButton.styleFrom(
                     backgroundColor: color,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -298,14 +361,6 @@ class _PlanCard extends StatelessWidget {
     return '12 месяцев';
   }
 
-  void _onBuy(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Оплата тарифа «${plan.name}» — скоро будет доступно'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
 }
 
 class _InfoChip extends StatelessWidget {
