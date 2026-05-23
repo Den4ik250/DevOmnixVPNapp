@@ -3,11 +3,11 @@ import 'package:flutter/services.dart';
 
 abstract class Constants {
   static const appName = "DevOmnix VPN";
-  static const githubUrl = "https://github.com/hiddify/hiddify-next";
-  static const licenseUrl = "https://github.com/hiddify/hiddify-next?tab=License-1-ov-file#readme";
-  static const githubReleasesApiUrl = "https://api.github.com/repos/hiddify/hiddify-next/releases";
-  static const githubLatestReleaseUrl = "https://github.com/hiddify/hiddify-app/releases/latest";
-  static const appCastUrl = "https://raw.githubusercontent.com/hiddify/hiddify-next/main/appcast.xml";
+  static const githubUrl = "https://github.com/Den4ik250/DevOmnixVPNapp";
+  static const licenseUrl = "https://github.com/Den4ik250/DevOmnixVPNapp?tab=License-1-ov-file#readme";
+  static const githubReleasesApiUrl = "https://api.github.com/repos/Den4ik250/DevOmnixVPNapp/releases";
+  static const githubLatestReleaseUrl = "https://github.com/Den4ik250/DevOmnixVPNapp/releases/latest";
+  static const appCastUrl = "https://raw.githubusercontent.com/Den4ik250/DevOmnixVPNapp/main/appcast.xml";
   static const telegramChannelUrl = "https://t.me/devomnix";
   static const privacyPolicyUrl = "https://devomnix.com/privacy-policy/";
   static const termsAndConditionsUrl = "https://devomnix.com/terms/";
