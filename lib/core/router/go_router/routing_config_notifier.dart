@@ -13,6 +13,8 @@ import 'package:hiddify/features/connect/widget/connect_page.dart';
 import 'package:hiddify/features/faq/widget/faq_page.dart';
 import 'package:hiddify/features/home/widget/home_page.dart';
 import 'package:hiddify/features/plans/widget/plans_page.dart';
+import 'package:hiddify/features/profile_tab/widget/diagnostics_page.dart';
+import 'package:hiddify/features/profile_tab/widget/profile_tab_page.dart';
 import 'package:hiddify/features/referral/widget/referral_page.dart';
 import 'package:hiddify/features/wallet/widget/wallet_page.dart';
 import 'package:hiddify/features/intro/widget/intro_page.dart';
@@ -37,6 +39,7 @@ part 'routing_config_notifier.g.dart';
 // each branch in go router has its own focus scope
 final branchesScope = <String, FocusScopeNode>{
   'home': FocusScopeNode(),
+  'profile': FocusScopeNode(),
   'profiles': FocusScopeNode(),
   'settings': FocusScopeNode(),
   'logs': FocusScopeNode(),
@@ -49,11 +52,11 @@ final loadingConfig = RoutingConfig(
 );
 
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => isMobileBreakpoint
-    ? ['home', 'settings'][index]
+    ? ['home', 'profile', 'settings'][index]
     : ['home', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'][index];
 
 int getIndexOfBranch(bool isMobileBreakpoint, bool showProfilesAction, String name) => isMobileBreakpoint
-    ? ['home', 'settings'].indexOf(name)
+    ? ['home', 'profile', 'settings'].indexOf(name)
     : ['home', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'].indexOf(name);
 
 @Riverpod(keepAlive: true)
@@ -144,6 +147,49 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                 ),
               ],
             ),
+            // ── Profile tab (mobile only) ──────────────────────────────
+            if (isMobileBreakpoint)
+              StatefulShellBranch(
+                routes: <GoRoute>[
+                  GoRoute(
+                    name: 'profileTab',
+                    path: '/profile-tab',
+                    builder: (_, _) => FocusScope(node: branchesScope['profile'], child: const ProfileTabPage()),
+                    routes: <GoRoute>[
+                      GoRoute(
+                        name: 'plans',
+                        path: '/plans',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const PlansPage()),
+                      ),
+                      GoRoute(
+                        name: 'wallet',
+                        path: '/wallet',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const WalletPage()),
+                      ),
+                      GoRoute(
+                        name: 'referral',
+                        path: '/referral',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const ReferralPage()),
+                      ),
+                      GoRoute(
+                        name: 'faq',
+                        path: '/faq',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const FaqPage()),
+                      ),
+                      GoRoute(
+                        name: 'diagnostics',
+                        path: '/diagnostics',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const DiagnosticsPage()),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             if (showProfilesAction)
               StatefulShellBranch(
                 routes: <GoRoute>[
@@ -179,30 +225,32 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                     ),
                   ),
                   routes: <GoRoute>[
-                    GoRoute(
-                      name: 'plans',
-                      path: '/plans',
-                      pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const PlansPage()),
-                    ),
-                    GoRoute(
-                      name: 'wallet',
-                      path: '/wallet',
-                      pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const WalletPage()),
-                    ),
-                    GoRoute(
-                      name: 'referral',
-                      path: '/referral',
-                      pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const ReferralPage()),
-                    ),
-                    GoRoute(
-                      name: 'faq',
-                      path: '/faq',
-                      pageBuilder: (_, state) =>
-                          customTransition(TransitionType.slide, state.pageKey, const FaqPage()),
-                    ),
+                    if (!isMobileBreakpoint) ...[
+                      GoRoute(
+                        name: 'plans',
+                        path: '/plans',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const PlansPage()),
+                      ),
+                      GoRoute(
+                        name: 'wallet',
+                        path: '/wallet',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const WalletPage()),
+                      ),
+                      GoRoute(
+                        name: 'referral',
+                        path: '/referral',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const ReferralPage()),
+                      ),
+                      GoRoute(
+                        name: 'faq',
+                        path: '/faq',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const FaqPage()),
+                      ),
+                    ],
                     GoRoute(
                       name: 'general',
                       path: '/general',

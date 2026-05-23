@@ -4,33 +4,58 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-  <!-- Shield -->
+  <!-- Hexagon outline (pointy-top), center 54,54, radius 38 -->
   <path
-      android:pathData="M54,13 L89,25 L89,53 C89,70 77,84 54,90 C31,84 19,70 19,53 L19,25 Z"
-      android:fillColor="#FFFFFF"/>
+      android:pathData="M54,16 L87,35 L87,73 L54,92 L21,73 L21,35 Z"
+      android:strokeColor="#4499FF"
+      android:strokeWidth="3.5"
+      android:fillColor="#00000000"
+      android:strokeLineJoin="round"/>
 
-  <!-- Lock body (rounded rect via path) -->
+  <!-- Three forward slashes /// -->
   <path
-      android:pathData="M41,54 L67,54 Q71,54 71,58 L71,71 Q71,75 67,75 L41,75 Q37,75 37,71 L37,58 Q37,54 41,54 Z"
-      android:fillColor="#0B3D91"/>
+      android:pathData="M37,32 L43,50"
+      android:strokeColor="#8866EE"
+      android:strokeWidth="5"
+      android:strokeLineCap="round"
+      android:fillColor="#00000000"/>
+  <path
+      android:pathData="M47,32 L53,50"
+      android:strokeColor="#8866EE"
+      android:strokeWidth="5"
+      android:strokeLineCap="round"
+      android:fillColor="#00000000"/>
+  <path
+      android:pathData="M57,32 L63,50"
+      android:strokeColor="#8866EE"
+      android:strokeWidth="5"
+      android:strokeLineCap="round"
+      android:fillColor="#00000000"/>
+
+  <!-- Lock body -->
+  <path
+      android:pathData="M38,60 L70,60 Q74,60 74,64 L74,82 Q74,86 70,86 L38,86 Q34,86 34,82 L34,64 Q34,60 38,60 Z"
+      android:strokeColor="#00CCFF"
+      android:strokeWidth="3"
+      android:fillColor="#00000000"/>
 
   <!-- Lock shackle -->
   <path
-      android:pathData="M45.5,54 L45.5,47.5 A8.5,8.5 0 0 1 62.5,47.5 L62.5,54"
-      android:strokeColor="#FFFFFF"
+      android:pathData="M42,60 L42,52 A12,12 0 0 1 66,52 L66,60"
+      android:strokeColor="#00CCFF"
       android:strokeWidth="3.5"
       android:fillColor="#00000000"
       android:strokeLineCap="round"
       android:strokeLineJoin="round"/>
 
-  <!-- Keyhole circle (as path) -->
+  <!-- Keyhole circle -->
   <path
-      android:pathData="M54,61 A3,3 0 1 0 54.001,61 Z"
-      android:fillColor="#FFFFFF"/>
+      android:pathData="M54,72 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0"
+      android:fillColor="#00CCFF"/>
 
   <!-- Keyhole slot -->
   <path
-      android:pathData="M52.5,64 L55.5,64 L55.5,69.5 Q55.5,70.5 54,70.5 Q52.5,70.5 52.5,69.5 Z"
-      android:fillColor="#FFFFFF"/>
+      android:pathData="M52,76 L56,76 L56,83 Q56,85 54,85 Q52,85 52,83 Z"
+      android:fillColor="#00CCFF"/>
 
 </vector>

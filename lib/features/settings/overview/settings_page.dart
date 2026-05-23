@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/features/settings/notifier/config_option/config_option_notifier.dart';
@@ -140,86 +143,130 @@ class SettingsPage extends HookConsumerWidget {
       ),
       body: ListView(
         children: [
-          // ── DevOmnix sections ─────────────────────────────────────────────
-          SettingsSection(
-            title: 'Тарифы и подписка',
-            icon: Icons.credit_card_rounded,
-            namedLocation: context.namedLocation('plans'),
-          ),
-          SettingsSection(
-            title: 'Кошелёк',
-            icon: Icons.account_balance_wallet_rounded,
-            namedLocation: context.namedLocation('wallet'),
-          ),
-          SettingsSection(
-            title: 'Реферальная программа',
-            icon: Icons.people_rounded,
-            namedLocation: context.namedLocation('referral'),
-          ),
-          SettingsSection(
-            title: 'Частые вопросы (FAQ)',
-            icon: Icons.help_outline_rounded,
-            namedLocation: context.namedLocation('faq'),
-          ),
-          const Divider(),
-          // ── Technical settings ────────────────────────────────────────────
-          // TipCard(message: t.settings.experimentalMsg),
           SettingsSection(
             title: t.pages.settings.general.title,
-            icon: Icons.layers_rounded,
+            icon: Icons.settings_rounded,
             namedLocation: context.namedLocation('general'),
           ),
-          SettingsSection(
-            title: t.pages.settings.routing.title,
-            icon: Icons.route_rounded,
-            namedLocation: context.namedLocation('routeOptions'),
+          ListTile(
+            leading: const Icon(Icons.add_circle_rounded),
+            title: const Text('Добавить свои настройки'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _showAddConfigSheet(context, ref),
           ),
-          SettingsSection(
-            title: t.pages.settings.dns.title,
-            icon: Icons.dns_rounded,
-            namedLocation: context.namedLocation('dnsOptions'),
-          ),
-          SettingsSection(
-            title: t.pages.settings.inbound.title,
-            icon: Icons.input_rounded,
-            namedLocation: context.namedLocation('inboundOptions'),
-          ),
-          SettingsSection(
-            title: t.pages.settings.tlsTricks.title,
-            icon: Icons.content_cut_rounded,
-            namedLocation: context.namedLocation('tlsTricks'),
-          ),
-          SettingsSection(
-            title: t.pages.settings.warp.title,
-            icon: Icons.cloud_rounded,
-            namedLocation: context.namedLocation('warpOptions'),
-          ),
-          if (PlatformUtils.isIOS)
-            Material(
-              child: ListTile(
-                title: Text(t.pages.settings.resetTunnel),
-                leading: const Icon(Icons.autorenew_rounded),
-                onTap: () async {
-                  await ref.read(resetTunnelNotifierProvider.notifier).run();
-                },
+          // ── Visible only in debug builds ──────────────────────────────────
+          if (kDebugMode) ...[
+            const Divider(),
+            SettingsSection(
+              title: t.pages.settings.routing.title,
+              icon: Icons.route_rounded,
+              namedLocation: context.namedLocation('routeOptions'),
+            ),
+            SettingsSection(
+              title: t.pages.settings.dns.title,
+              icon: Icons.dns_rounded,
+              namedLocation: context.namedLocation('dnsOptions'),
+            ),
+            SettingsSection(
+              title: t.pages.settings.inbound.title,
+              icon: Icons.input_rounded,
+              namedLocation: context.namedLocation('inboundOptions'),
+            ),
+            SettingsSection(
+              title: t.pages.settings.tlsTricks.title,
+              icon: Icons.content_cut_rounded,
+              namedLocation: context.namedLocation('tlsTricks'),
+            ),
+            SettingsSection(
+              title: t.pages.settings.warp.title,
+              icon: Icons.cloud_rounded,
+              namedLocation: context.namedLocation('warpOptions'),
+            ),
+            if (PlatformUtils.isIOS)
+              Material(
+                child: ListTile(
+                  title: Text(t.pages.settings.resetTunnel),
+                  leading: const Icon(Icons.autorenew_rounded),
+                  onTap: () async => ref.read(resetTunnelNotifierProvider.notifier).run(),
+                ),
               ),
-            ),
-          if (Breakpoint(context).isMobile()) ...[
-            SettingsSection(
-              title: t.pages.logs.title,
-              icon: Icons.description_rounded,
-              namedLocation: context.namedLocation('logs'),
-            ),
-            SettingsSection(
-              title: t.pages.about.title,
-              icon: Icons.info_rounded,
-              namedLocation: context.namedLocation('about'),
-            ),
+            if (Breakpoint(context).isMobile()) ...[
+              SettingsSection(
+                title: t.pages.logs.title,
+                icon: Icons.description_rounded,
+                namedLocation: context.namedLocation('logs'),
+              ),
+              SettingsSection(
+                title: t.pages.about.title,
+                icon: Icons.info_rounded,
+                namedLocation: context.namedLocation('about'),
+              ),
+            ],
           ],
         ],
       ),
     );
   }
+}
+
+void _showAddConfigSheet(BuildContext context, WidgetRef ref) {
+  showModalBottomSheet<void>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 8),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Theme.of(ctx).colorScheme.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ListTile(
+            leading: const Icon(Icons.qr_code_scanner_rounded),
+            title: const Text('Сканировать QR-код'),
+            onTap: () {
+              Navigator.of(ctx).pop();
+              context.goNamed('connect');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.paste_rounded),
+            title: const Text('Из буфера обмена'),
+            onTap: () async {
+              Navigator.of(ctx).pop();
+              final data = await Clipboard.getData('text/plain');
+              final url = data?.text?.trim() ?? '';
+              if (url.isEmpty) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Буфер обмена пуст')),
+                  );
+                }
+                return;
+              }
+              if (context.mounted) {
+                ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(url: url);
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.edit_rounded),
+            title: const Text('Вставить вручную'),
+            onTap: () {
+              Navigator.of(ctx).pop();
+              ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile();
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
 }
 
 class SettingsSection extends HookConsumerWidget {
