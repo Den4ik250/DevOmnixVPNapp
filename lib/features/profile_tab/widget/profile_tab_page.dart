@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/features/backend/backend_api_provider.dart';
@@ -21,6 +22,12 @@ class ProfileTabPage extends ConsumerWidget {
             title: 'Тарифы и подписка',
             subtitle: 'Купить или продлить подписку',
             onTap: () => context.goNamed('plans'),
+          ),
+          _ProfileSection(
+            icon: Icons.confirmation_num_rounded,
+            title: 'Активировать промокод',
+            subtitle: 'Введите код для получения подписки',
+            onTap: () => _showPromoDialog(context, ref),
           ),
           _ProfileSection(
             icon: Icons.account_balance_wallet_rounded,
@@ -50,6 +57,174 @@ class ProfileTabPage extends ConsumerWidget {
       ),
     );
   }
+}
+
+Future<void> _showPromoDialog(BuildContext context, WidgetRef ref) async {
+  final controller = TextEditingController();
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => _PromoDialog(controller: controller, ref: ref),
+  );
+  controller.dispose();
+}
+
+// ── Promo dialog ──────────────────────────────────────────────────────────────
+
+class _PromoDialog extends ConsumerStatefulWidget {
+  const _PromoDialog({required this.controller, required this.ref});
+  final TextEditingController controller;
+  final WidgetRef ref;
+
+  @override
+  ConsumerState<_PromoDialog> createState() => _PromoDialogState();
+}
+
+class _PromoDialogState extends ConsumerState<_PromoDialog> {
+  bool _loading = false;
+  String? _error;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('Промокод'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Введите промокод для активации подписки:'),
+          const Gap(12),
+          TextField(
+            controller: widget.controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(
+              hintText: 'НАПРИМЕР: PROMO2024',
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () => widget.controller.clear(),
+              ),
+            ),
+            onSubmitted: (_) => _activate(context),
+          ),
+          if (_error != null) ...[
+            const Gap(8),
+            Text(_error!, style: TextStyle(color: theme.colorScheme.error, fontSize: 13)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _loading ? null : () => Navigator.pop(context),
+          child: const Text('Отмена'),
+        ),
+        FilledButton(
+          onPressed: _loading ? null : () => _activate(context),
+          child: _loading
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Активировать'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _activate(BuildContext context) async {
+    final code = widget.controller.text.trim().toUpperCase();
+    if (code.isEmpty) {
+      setState(() => _error = 'Введите промокод');
+      return;
+    }
+    setState(() { _loading = true; _error = null; });
+    try {
+      final dio = ref.read(backendDioProvider);
+      final resp = await dio.post('/promo/activate', data: {'code': code});
+      final data = resp.data as Map<String, dynamic>;
+
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      await _showSuccess(context, data);
+    } catch (e) {
+      String msg = 'Ошибка соединения с сервером';
+      try {
+        final detail = (e as dynamic).response?.data?['detail'];
+        if (detail != null) msg = detail.toString();
+      } catch (_) {}
+      setState(() { _loading = false; _error = msg; });
+    }
+  }
+}
+
+Future<void> _showSuccess(BuildContext context, Map<String, dynamic> data) async {
+  final vless = data['vless_url'] as String? ?? '';
+  final expires = data['expires_at'] as String?;
+  String expiryText = '';
+  if (expires != null) {
+    try {
+      final dt = DateTime.parse(expires).toLocal();
+      expiryText = 'до ${dt.day}.${dt.month.toString().padLeft(2,'0')}.${dt.year}';
+    } catch (_) {}
+  }
+
+  await showDialog<void>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Row(children: [
+        Icon(Icons.check_circle_rounded, color: Colors.green.shade600, size: 28),
+        const Gap(8),
+        const Text('Подписка активирована'),
+      ]),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (expiryText.isNotEmpty) ...[
+            Text('Активна $expiryText', style: const TextStyle(fontWeight: FontWeight.w600)),
+            const Gap(12),
+          ],
+          const Text('VLESS URL для подключения:'),
+          const Gap(8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    vless,
+                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.copy, size: 18),
+                  tooltip: 'Скопировать',
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: vless));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Скопировано'), duration: Duration(seconds: 1)),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const Gap(8),
+          const Text(
+            'Вставьте ссылку в поле добавления профиля (значок + на главном экране).',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+      actions: [
+        FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Готово')),
+      ],
+    ),
+  );
 }
 
 class _AccountHeader extends ConsumerWidget {
