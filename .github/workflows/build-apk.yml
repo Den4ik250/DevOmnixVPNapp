@@ -45,6 +45,25 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Patch simple_icons (Flutter 3.44.0 compat)
+        run: |
+          FILE=$(find ~/.pub-cache -path "*/simple_icons-14.6.1/lib/src/icon_data.dart" | head -1)
+          if [ -n "$FILE" ]; then
+            cat > "$FILE" << 'EOF'
+          import 'package:flutter/widgets.dart';
+          IconData simpleIconData(int codePoint) => IconData(
+            codePoint,
+            fontFamily: 'SimpleIcons',
+            fontPackage: 'simple_icons',
+          );
+          class SimpleIconData {
+            final int codePoint;
+            const SimpleIconData(this.codePoint);
+          }
+          EOF
+            echo "Patched: $FILE"
+          fi
+
       - name: Generate code (build_runner)
         run: dart run build_runner build --delete-conflicting-outputs
 
