@@ -29,10 +29,10 @@ class FreeBtns extends ConsumerWidget {
               child: GridView.builder(
                 controller: scrollController,
                 padding: const EdgeInsets.all(16).copyWith(bottom: 0),
-                itemCount: freeProfiles.value!.length,
+                itemCount: data.length,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount:
-                      MediaQuery.of(context).size.width <= BottomSheetConst.maxWidth || freeProfiles.value!.length < 2
+                      MediaQuery.of(context).size.width <= BottomSheetConst.maxWidth || data.length < 2
                       ? 1
                       : 2,
                   mainAxisSpacing: 8,
@@ -40,7 +40,7 @@ class FreeBtns extends ConsumerWidget {
                   mainAxisExtent: 72,
                 ),
                 itemBuilder: (context, index) {
-                  final profile = freeProfiles.value![index];
+                  final profile = data[index];
                   return FreeBtn(
                     freeProfile: profile,
                     onTap: () async {

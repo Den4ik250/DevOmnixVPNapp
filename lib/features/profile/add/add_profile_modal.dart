@@ -87,6 +87,16 @@ class AddProfileOptions extends HookConsumerWidget {
   }
 }
 
+bool _isProxyUrl(String url) {
+  return url.startsWith('vless://') ||
+      url.startsWith('vmess://') ||
+      url.startsWith('trojan://') ||
+      url.startsWith('ss://') ||
+      url.startsWith('tuic://') ||
+      url.startsWith('hysteria2://') ||
+      url.startsWith('hy2://');
+}
+
 class AddProfileManual extends HookConsumerWidget {
   const AddProfileManual({super.key});
 
@@ -156,7 +166,12 @@ class AddProfileManual extends HookConsumerWidget {
             child: CustomTextFormField(
               maxLines: 1,
               controller: urlTextController,
-              validator: (value) => (value != null && !isUrl(value)) ? t.pages.profileDetails.form.invalidUrl : null,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) return null;
+                final v = value.trim();
+                if (isUrl(v) || _isProxyUrl(v)) return null;
+                return t.pages.profileDetails.form.invalidUrl;
+              },
               label: t.common.url,
               hint: t.pages.profileDetails.form.urlHint,
             ),
@@ -222,18 +237,25 @@ class AddProfileManual extends HookConsumerWidget {
                     child: Text(t.common.add),
                     onPressed: () async {
                       if (formKey.currentState!.validate()) {
+                        final url = urlTextController.text.trim();
                         final i = updateInterval.value.toInt();
                         final interval = i > 0 ? i : null;
-                        await ref
-                            .read(addProfileNotifierProvider.notifier)
-                            .addManual(
-                              url: urlTextController.text.trim(),
-                              userOverride: UserOverride(
-                                name: nameTextController.text.trim(),
-                                isAutoUpdateDisable: isAutoUpdateDisable.value,
-                                updateInterval: interval,
-                              ),
-                            );
+                        if (_isProxyUrl(url)) {
+                          await ref
+                              .read(addProfileNotifierProvider.notifier)
+                              .addClipboard(url);
+                        } else {
+                          await ref
+                              .read(addProfileNotifierProvider.notifier)
+                              .addManual(
+                                url: url,
+                                userOverride: UserOverride(
+                                  name: nameTextController.text.trim(),
+                                  isAutoUpdateDisable: isAutoUpdateDisable.value,
+                                  updateInterval: interval,
+                                ),
+                              );
+                        }
                       }
                     },
                   ),

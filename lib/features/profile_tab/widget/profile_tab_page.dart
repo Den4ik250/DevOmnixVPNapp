@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/features/backend/backend_api_provider.dart';
+import 'package:hiddify/features/home/notifier/vpn_auto_init_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class ProfileTabPage extends ConsumerWidget {
@@ -141,9 +142,16 @@ class _PromoDialogState extends ConsumerState<_PromoDialog> {
       final resp = await dio.post('/promo/activate', data: {'code': code});
       final data = resp.data as Map<String, dynamic>;
 
+      // Auto-add / update VPN profile so user can connect immediately
+      bool profileAdded = false;
+      try {
+        await ref.read(vpnAutoInitProvider.notifier).switchServer(1);
+        profileAdded = true;
+      } catch (_) {}
+
       if (!context.mounted) return;
       Navigator.pop(context);
-      await _showSuccess(context, data);
+      await _showSuccess(context, data, profileAdded: profileAdded);
     } catch (e) {
       String msg = 'Ошибка соединения с сервером';
       try {
@@ -155,7 +163,7 @@ class _PromoDialogState extends ConsumerState<_PromoDialog> {
   }
 }
 
-Future<void> _showSuccess(BuildContext context, Map<String, dynamic> data) async {
+Future<void> _showSuccess(BuildContext context, Map<String, dynamic> data, {bool profileAdded = false}) async {
   final vless = data['vless_url'] as String? ?? '';
   final expires = data['expires_at'] as String?;
   String expiryText = '';
@@ -182,42 +190,50 @@ Future<void> _showSuccess(BuildContext context, Map<String, dynamic> data) async
             Text('Активна $expiryText', style: const TextStyle(fontWeight: FontWeight.w600)),
             const Gap(12),
           ],
-          const Text('VLESS URL для подключения:'),
-          const Gap(8),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    vless,
-                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+          if (profileAdded) ...[
+            Row(children: [
+              Icon(Icons.wifi_rounded, color: Colors.green.shade600, size: 18),
+              const Gap(6),
+              const Expanded(child: Text('VPN профиль настроен. Перейдите на главный экран и нажмите «Подключиться».')),
+            ]),
+          ] else ...[
+            const Text('VLESS URL для подключения:'),
+            const Gap(8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      vless,
+                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.copy, size: 18),
-                  tooltip: 'Скопировать',
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: vless));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Скопировано'), duration: Duration(seconds: 1)),
-                    );
-                  },
-                ),
-              ],
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: 'Скопировать',
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: vless));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Скопировано'), duration: Duration(seconds: 1)),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Gap(8),
-          const Text(
-            'Вставьте ссылку в поле добавления профиля (значок + на главном экране).',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
+            const Gap(8),
+            const Text(
+              'Скопируйте и вставьте в поле добавления профиля (значок + на главном экране).',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
         ],
       ),
       actions: [
