@@ -231,54 +231,6 @@ class PerAppProxyPage extends HookConsumerWidget with PresLogger {
                   ),
                 ),
               ],
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(48),
-                child: Expanded(
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    children: [
-                      PopupMenuButton(
-                        borderRadius: BorderRadius.circular(8),
-                        position: PopupMenuPosition.under,
-                        tooltip: (mode?.toPerAppProxy() ?? PerAppProxyMode.off).present(t).message,
-                        initialValue: mode?.toPerAppProxy() ?? PerAppProxyMode.off,
-                        onSelected: (e) async {
-                          if (ref.read(Preferences.autoAppsSelectionRegion) != null)
-                            await ref.read(PerAppProxyProvider(mode).notifier).clearAutoSelected();
-                          if (e == PerAppProxyMode.off && context.mounted) context.pop();
-                          await ref.read(Preferences.perAppProxyMode.notifier).update(e);
-                        },
-                        itemBuilder: (context) => PerAppProxyMode.values
-                            .map((e) => PopupMenuItem(value: e, child: Text(e.present(t).message)))
-                            .toList(),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            color: theme.colorScheme.surface,
-                            border: Border.all(color: theme.colorScheme.outlineVariant),
-                          ),
-                          child: Row(
-                            children: [
-                              const Gap(16),
-                              Text(mode?.present(t).title ?? ''),
-                              const Gap(4),
-                              Icon(Icons.arrow_drop_down_rounded, color: theme.colorScheme.onSurfaceVariant),
-                              const Gap(8),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const Gap(8),
-                      ChoiceChip(
-                        label: Text(t.pages.settings.routing.perAppProxy.hideSysApps),
-                        selected: hideSystemApps.value,
-                        onSelected: (value) => hideSystemApps.value = value,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ),
       floatingActionButton: showScrollToTop.value
           ? FloatingActionButton(
@@ -298,7 +250,55 @@ class PerAppProxyPage extends HookConsumerWidget with PresLogger {
               ),
             )
           : null,
-      body: displayedApps.when(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                PopupMenuButton(
+                  borderRadius: BorderRadius.circular(8),
+                  position: PopupMenuPosition.under,
+                  tooltip: (mode?.toPerAppProxy() ?? PerAppProxyMode.off).present(t).message,
+                  initialValue: mode?.toPerAppProxy() ?? PerAppProxyMode.off,
+                  onSelected: (e) async {
+                    if (ref.read(Preferences.autoAppsSelectionRegion) != null)
+                      await ref.read(PerAppProxyProvider(mode).notifier).clearAutoSelected();
+                    if (e == PerAppProxyMode.off && context.mounted) context.pop();
+                    await ref.read(Preferences.perAppProxyMode.notifier).update(e);
+                  },
+                  itemBuilder: (context) => PerAppProxyMode.values
+                      .map((e) => PopupMenuItem(value: e, child: Text(e.present(t).message)))
+                      .toList(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: theme.colorScheme.surface,
+                      border: Border.all(color: theme.colorScheme.outlineVariant),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(mode?.present(t).title ?? ''),
+                        const Gap(4),
+                        Icon(Icons.arrow_drop_down_rounded, color: theme.colorScheme.onSurfaceVariant),
+                      ],
+                    ),
+                  ),
+                ),
+                const Gap(8),
+                ChoiceChip(
+                  label: Text(t.pages.settings.routing.perAppProxy.hideSysApps),
+                  selected: hideSystemApps.value,
+                  onSelected: (value) => hideSystemApps.value = value,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: displayedApps.when(
         data: (packages) => ListView.builder(
           padding: const EdgeInsets.only(bottom: 88),
           controller: scrollController,
@@ -337,6 +337,9 @@ class PerAppProxyPage extends HookConsumerWidget with PresLogger {
         ),
         error: (error, _) => SliverErrorBodyPlaceholder(error.toString()),
         loading: () => const Center(child: CircularProgressIndicator()),
+      ),
+          ),
+        ],
       ),
     );
   }

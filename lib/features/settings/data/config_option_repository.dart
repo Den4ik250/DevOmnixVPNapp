@@ -438,7 +438,7 @@ abstract class ConfigOptions {
       setSystemProxy: mode == ServiceMode.systemProxy,
       bypassLan: ref.watch(bypassLan),
       allowConnectionFromLan: ref.watch(allowConnectionFromLan),
-      enableFakeDns: ref.watch(enableFakeDns),
+      enableFakeDns: true,
       // enableDnsRouting: ref.watch(enableDnsRouting),
       independentDnsCache: ref.watch(independentDnsCache),
       // mux: SingboxMuxOption(

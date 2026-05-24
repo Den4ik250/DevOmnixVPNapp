@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/features/backend/backend_api_provider.dart';
@@ -139,19 +138,20 @@ class _PromoDialogState extends ConsumerState<_PromoDialog> {
     setState(() { _loading = true; _error = null; });
     try {
       final dio = ref.read(backendDioProvider);
-      final resp = await dio.post('/promo/activate', data: {'code': code});
-      final data = resp.data as Map<String, dynamic>;
+      await dio.post('/promo/activate', data: {'code': code});
 
-      // Auto-add / update VPN profile so user can connect immediately
-      bool profileAdded = false;
       try {
         await ref.read(vpnAutoInitProvider.notifier).switchServer(1);
-        profileAdded = true;
       } catch (_) {}
 
       if (!context.mounted) return;
       Navigator.pop(context);
-      await _showSuccess(context, data, profileAdded: profileAdded);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Подписка активирована! VPN готов к подключению'),
+          duration: Duration(seconds: 3),
+        ),
+      );
     } catch (e) {
       String msg = 'Ошибка соединения с сервером';
       try {
@@ -163,85 +163,6 @@ class _PromoDialogState extends ConsumerState<_PromoDialog> {
   }
 }
 
-Future<void> _showSuccess(BuildContext context, Map<String, dynamic> data, {bool profileAdded = false}) async {
-  final vless = data['vless_url'] as String? ?? '';
-  final expires = data['expires_at'] as String?;
-  String expiryText = '';
-  if (expires != null) {
-    try {
-      final dt = DateTime.parse(expires).toLocal();
-      expiryText = 'до ${dt.day}.${dt.month.toString().padLeft(2,'0')}.${dt.year}';
-    } catch (_) {}
-  }
-
-  await showDialog<void>(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Row(children: [
-        Icon(Icons.check_circle_rounded, color: Colors.green.shade600, size: 28),
-        const Gap(8),
-        const Text('Подписка активирована'),
-      ]),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (expiryText.isNotEmpty) ...[
-            Text('Активна $expiryText', style: const TextStyle(fontWeight: FontWeight.w600)),
-            const Gap(12),
-          ],
-          if (profileAdded) ...[
-            Row(children: [
-              Icon(Icons.wifi_rounded, color: Colors.green.shade600, size: 18),
-              const Gap(6),
-              const Expanded(child: Text('VPN профиль настроен. Перейдите на главный экран и нажмите «Подключиться».')),
-            ]),
-          ] else ...[
-            const Text('VLESS URL для подключения:'),
-            const Gap(8),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      vless,
-                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 18),
-                    tooltip: 'Скопировать',
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: vless));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Скопировано'), duration: Duration(seconds: 1)),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const Gap(8),
-            const Text(
-              'Скопируйте и вставьте в поле добавления профиля (значок + на главном экране).',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ],
-      ),
-      actions: [
-        FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Готово')),
-      ],
-    ),
-  );
-}
 
 class _AccountHeader extends ConsumerWidget {
   const _AccountHeader({required this.ref});
