@@ -70,7 +70,9 @@ jobs:
                   )
               print(f"Patched: {stub}")
 
-          # 2. Patch icon_data.g.dart — replace SimpleIconData icons with IconData
+          # 2. Patch icon_data.g.dart — replace "= SimpleIconData(0xHEX)" with IconData(...)
+          #    Handles both field-type variants: "const IconData X = SimpleIconData(...)"
+          #    and "const SimpleIconData X = SimpleIconData(...)"
           gen = os.path.join(base, "icon_data.g.dart")
           if os.path.exists(gen):
               with open(gen) as f:
@@ -78,10 +80,12 @@ jobs:
               if "package:flutter/widgets.dart" not in content:
                   content = "import 'package:flutter/widgets.dart';\n" + content
               content = re.sub(
-                  r"static const SimpleIconData (\w+) = SimpleIconData\(0x([0-9a-fA-F]+)\);",
-                  r"static const IconData \1 = IconData(0x\2, fontFamily: 'SimpleIcons', fontPackage: 'simple_icons');",
+                  r"= SimpleIconData\(0x([0-9a-fA-F]+)\);",
+                  r"= IconData(0x\1, fontFamily: 'SimpleIcons', fontPackage: 'simple_icons');",
                   content,
               )
+              # Also fix field type declarations "const SimpleIconData X" → "const IconData X"
+              content = content.replace("static const SimpleIconData ", "static const IconData ")
               with open(gen, "w") as f:
                   f.write(content)
               print(f"Patched: {gen}")
