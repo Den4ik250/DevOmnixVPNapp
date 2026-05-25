@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/features/backend/backend_api_provider.dart';
+import 'package:hiddify/features/backend_update/model/backend_update_state.dart';
+import 'package:hiddify/features/backend_update/notifier/backend_update_notifier.dart';
 import 'package:hiddify/features/home/notifier/vpn_auto_init_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileTabPage extends ConsumerWidget {
   const ProfileTabPage({super.key});
@@ -53,6 +57,7 @@ class ProfileTabPage extends ConsumerWidget {
             subtitle: 'Пинг сервера и пересоздание конфига',
             onTap: () => context.goNamed('diagnostics'),
           ),
+          const _AppVersionTile(),
         ],
       ),
     );
@@ -253,4 +258,85 @@ class _ProfileSection extends StatelessWidget {
       onTap: onTap,
     );
   }
+}
+
+class _AppVersionTile extends ConsumerWidget {
+  const _AppVersionTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final updateState = ref.watch(backendUpdateProvider);
+    final currentVersion = ref.watch(appInfoProvider).valueOrNull?.version ?? '';
+    final hasSoftUpdate = updateState.status == BackendUpdateStatus.softUpdate;
+
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(Icons.info_outline_rounded, color: theme.colorScheme.primary, size: 22),
+      ),
+      title: Row(
+        children: [
+          Text(
+            'Версия приложения',
+            style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+          ),
+          if (hasSoftUpdate) ...[
+            const Gap(8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                '!',
+                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ],
+      ),
+      subtitle: Text(
+        hasSoftUpdate
+            ? '$currentVersion → ${updateState.latestVersion}'
+            : currentVersion,
+        style: theme.textTheme.bodySmall,
+      ),
+      trailing: hasSoftUpdate ? const Icon(Icons.chevron_right_rounded) : null,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      onTap: hasSoftUpdate ? () => _showSoftUpdateDialog(context, updateState) : null,
+    );
+  }
+}
+
+void _showSoftUpdateDialog(BuildContext context, BackendUpdateState state) {
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('Доступна версия ${state.latestVersion}'),
+      content: Text(
+        state.whatsNew.isNotEmpty
+            ? state.whatsNew
+            : 'Новая версия приложения доступна для обновления.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Позже'),
+        ),
+        FilledButton(
+          onPressed: () => launchUrl(
+            Uri.parse(state.downloadUrl),
+            mode: LaunchMode.externalApplication,
+          ),
+          child: const Text('Обновить'),
+        ),
+      ],
+    ),
+  );
 }
