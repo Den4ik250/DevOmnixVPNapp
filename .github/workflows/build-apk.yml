@@ -30,8 +30,10 @@ jobs:
           cache: true
 
       - name: Decode keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/devomnix.jks
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > android/devomnix.jks
 
       - name: Write key.properties
         run: |
