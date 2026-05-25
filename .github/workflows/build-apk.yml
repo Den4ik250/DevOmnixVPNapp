@@ -46,7 +46,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release download core-v1 \
+          gh release download 1.2.2 \
             --repo Den4ik250/DevOmnixVPNapp \
             --pattern "hiddify-core.aar" \
             --dir android/app/libs/
