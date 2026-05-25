@@ -47,22 +47,45 @@ jobs:
 
       - name: Patch simple_icons (Flutter 3.44.0 compat)
         run: |
-          FILE=$(find ~/.pub-cache -path "*/simple_icons-14.6.1/lib/src/icon_data.dart" | head -1)
-          if [ -n "$FILE" ]; then
-            cat > "$FILE" << 'EOF'
-          import 'package:flutter/widgets.dart';
-          IconData simpleIconData(int codePoint) => IconData(
-            codePoint,
-            fontFamily: 'SimpleIcons',
-            fontPackage: 'simple_icons',
-          );
-          class SimpleIconData {
-            final int codePoint;
-            const SimpleIconData(this.codePoint);
-          }
-          EOF
-            echo "Patched: $FILE"
-          fi
+          python3 << 'PYEOF'
+          import re, os, glob
+
+          base = os.path.expanduser("~/.pub-cache/hosted/pub.dev/simple_icons-14.6.1/lib/src")
+
+          # 1. Patch icon_data.dart — stub SimpleIconData so it no longer extends IconData
+          stub = os.path.join(base, "icon_data.dart")
+          if os.path.exists(stub):
+              with open(stub, "w") as f:
+                  f.write(
+                      "import 'package:flutter/widgets.dart';\n"
+                      "IconData simpleIconData(int codePoint) => IconData(\n"
+                      "  codePoint,\n"
+                      "  fontFamily: 'SimpleIcons',\n"
+                      "  fontPackage: 'simple_icons',\n"
+                      ");\n"
+                      "class SimpleIconData {\n"
+                      "  final int codePoint;\n"
+                      "  const SimpleIconData(this.codePoint);\n"
+                      "}\n"
+                  )
+              print(f"Patched: {stub}")
+
+          # 2. Patch icon_data.g.dart — replace SimpleIconData icons with IconData
+          gen = os.path.join(base, "icon_data.g.dart")
+          if os.path.exists(gen):
+              with open(gen) as f:
+                  content = f.read()
+              if "package:flutter/widgets.dart" not in content:
+                  content = "import 'package:flutter/widgets.dart';\n" + content
+              content = re.sub(
+                  r"static const SimpleIconData (\w+) = SimpleIconData\(0x([0-9a-fA-F]+)\);",
+                  r"static const IconData \1 = IconData(0x\2, fontFamily: 'SimpleIcons', fontPackage: 'simple_icons');",
+                  content,
+              )
+              with open(gen, "w") as f:
+                  f.write(content)
+              print(f"Patched: {gen}")
+          PYEOF
 
       - name: Generate code (build_runner)
         run: dart run build_runner build --delete-conflicting-outputs
