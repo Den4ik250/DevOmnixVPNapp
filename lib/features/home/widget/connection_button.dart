@@ -1,11 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
-import 'package:hiddify/core/model/failures.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
-import 'package:hiddify/core/theme/theme_extensions.dart';
 import 'package:hiddify/core/widget/animated_text.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/model/extended_connection_status.dart';
@@ -18,7 +18,6 @@ import 'package:hiddify/gen/assets.gen.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-// TODO: rewrite
 class ConnectionButton extends HookConsumerWidget {
   const ConnectionButton({super.key});
 
@@ -28,94 +27,16 @@ class ConnectionButton extends HookConsumerWidget {
     final connectionStatus = ref.watch(connectionNotifierProvider);
     final activeProxy = ref.watch(activeProxyNotifierProvider);
     final delay = activeProxy.valueOrNull?.urlTestDelay ?? 0;
-
     final requiresReconnect = ref.watch(configOptionNotifierProvider).valueOrNull;
-    final today = DateTime.now();
-    // final animationController = useAnimationController(
-    //   duration: const Duration(seconds: 1),
-    // )..repeat(reverse: true); // Ensure the animation loops indefinitely
 
-    //   // Listen to the animation's value
-    //   final animationValue = useAnimation(Tween<double>(begin: 0.8, end: 1).animate(animationController));
-
-    //   // useEffect(() {
-    //   //   if (true) {
-    //   // Start repeating animation
-    //   //   } else {
-    //   //     animationController.stop(); // Stop animation if connected, disconnected, or error
-    //   //   }
-
-    //   //   // Cleanup when widget is disposed
-    //   //   return animationController.dispose;
-    //   // }, [connectionStatus.value]);
-
-    //   // ref.listen(
-    //   //   connectionNotifierProvider,
-    //   //   (_, next) {
-    //   //     if (next case AsyncError(:final error)) {
-    //   //       CustomAlertDialog.fromErr(t.presentError(error)).show(context);
-    //   //     }
-    //   //     if (next case AsyncData(value: Disconnected(:final connectionFailure?))) {
-    //   //       CustomAlertDialog.fromErr(t.presentError(connectionFailure)).show(context);
-    //   //     }
-    //   //   },
-    //   // );
-
-    const buttonTheme = ConnectionButtonTheme.light;
-
-    //   // return CircleDesignWidget(
-    //   //   onTap: switch (connectionStatus) {
-    //   //     // AsyncData(value: Disconnected()) || AsyncError() => () async {
-    //   //     //     if (await showExperimentalNotice()) {
-    //   //     //       return await ref.read(connectionNotifierProvider.notifier).toggleConnection();
-    //   //     //     }
-    //   //     //   },
-    //   //     // AsyncData(value: Connected()) => () async {
-    //   //     //     if (requiresReconnect == true && await showExperimentalNotice()) {
-    //   //     //       return await ref.read(connectionNotifierProvider.notifier).reconnect(await ref.read(activeProfileProvider.future));
-    //   //     //     }
-    //   //     //     return await ref.read(connectionNotifierProvider.notifier).toggleConnection();
-    //   //     //   },
-    //   //     _ => () {},
-    //   //   },
-    //   //   // enabled: switch (connectionStatus) {
-    //   //   //   AsyncData(value: Connected()) || AsyncData(value: Disconnected()) || AsyncError() => true,
-    //   //   //   _ => false,
-    //   //   // },
-    //   //   // label: switch (connectionStatus) {
-    //   //   //   AsyncData(value: Connected()) when requiresReconnect == true => t.connection.reconnect,
-    //   //   //   AsyncData(value: Connected()) when delay <= 0 || delay >= 65000 => t.connection.connecting,
-    //   //   //   AsyncData(value: final status) => status.present(t),
-    //   //   //   _ => "",
-    //   //   // },
-    //   //   color: switch (connectionStatus) {
-    //   //     AsyncData(value: Connected()) when requiresReconnect == true => Colors.teal,
-    //   //     AsyncData(value: Connected()) when delay <= 0 || delay >= 65000 => Color.fromARGB(255, 157, 139, 1),
-    //   //     AsyncData(value: Connected()) => Colors.green.shade900,
-    //   //     AsyncData(value: _) => Colors.indigo.shade700, // Color(0xFF3446A5), //buttonTheme.idleColor!,
-    //   //     _ => Colors.red,
-    //   //   },
-
-    //   //   animated: true ||
-    //   //       switch (connectionStatus) {
-    //   //         AsyncData(value: Connected()) when requiresReconnect == true => false,
-    //   //         AsyncData(value: Connected()) when delay <= 0 || delay >= 65000 => false,
-    //   //         AsyncData(value: Connected()) => true,
-    //   //         AsyncData(value: _) => true,
-    //   //         _ => false,
-    //   //       },
-    //   //   animationValue: animationValue,
-    //   // );
-    // }
     var secureLabel =
         (ref.watch(ConfigOptions.enableWarp) && ref.watch(ConfigOptions.warpDetourMode) == WarpDetourMode.warpOverProxy)
-        ? t.connection.secure
-        : "";
+            ? t.connection.secure
+            : "";
     if (delay <= 0 || delay > 65000 || connectionStatus.value != const Connected()) {
       secureLabel = "";
     }
 
-    // Map core status → extended 8-state status for UI
     final extStatus = switch (connectionStatus) {
       AsyncData(value: final s) when delay > 0 && delay < 65000 && s == const Connected() =>
         ExtendedConnectionStatus.connected,
@@ -160,19 +81,8 @@ class ConnectionButton extends HookConsumerWidget {
       label: requiresReconnect == true && connectionStatus.value == const Connected()
           ? t.connection.reconnect
           : extStatus.label,
-      buttonColor: extStatus.color(context),
-      image: switch (connectionStatus) {
-        AsyncData(value: Connected()) when requiresReconnect == true => Assets.images.disconnectNorouz,
-        AsyncData(value: Connected()) => Assets.images.connectNorouz,
-        AsyncData(value: _) => Assets.images.disconnectNorouz,
-        _ => Assets.images.disconnectNorouz,
-        AsyncData(value: Disconnected()) || AsyncError() => Assets.images.disconnectNorouz,
-        AsyncData(value: Connected()) => Assets.images.connectNorouz,
-        _ => Assets.images.disconnectNorouz,
-      },
-      newButtonColor: extStatus.color(context),
+      extStatus: extStatus,
       animated: extStatus.isActive || extStatus.isConnected,
-      useImage: today.day >= 19 && today.day <= 23 && today.month == 3,
       secureLabel: secureLabel,
     );
   }
@@ -183,10 +93,7 @@ class _ConnectionButton extends StatelessWidget {
     required this.onTap,
     required this.enabled,
     required this.label,
-    required this.buttonColor,
-    required this.image,
-    required this.useImage,
-    required this.newButtonColor,
+    required this.extStatus,
     required this.animated,
     required this.secureLabel,
   });
@@ -194,57 +101,63 @@ class _ConnectionButton extends StatelessWidget {
   final VoidCallback onTap;
   final bool enabled;
   final String label;
-  final Color buttonColor;
-  final AssetGenImage image;
-  final bool useImage;
+  final ExtendedConnectionStatus extStatus;
+  final bool animated;
   final String secureLabel;
 
-  final Color newButtonColor;
+  static const _brandBlue = Color(0xFF4499FF);
+  static const _brandCyan = Color(0xFF00CCFF);
+  static const _connGreen1 = Color(0xFF22C55E);
+  static const _connGreen2 = Color(0xFF16A34A);
 
-  final bool animated;
+  (Color, Color) get _hexColors => extStatus.isConnected
+      ? (_connGreen1, _connGreen2)
+      : (_brandBlue, _brandCyan);
 
   @override
   Widget build(BuildContext context) {
+    final (c1, c2) = _hexColors;
+
+    Widget hexButton = SizedBox(
+      width: 148,
+      height: 148,
+      child: GestureDetector(
+        onTap: onTap,
+        child: TweenAnimationBuilder<Color?>(
+          tween: ColorTween(end: c1),
+          duration: const Duration(milliseconds: 400),
+          builder: (context, animC1, _) => TweenAnimationBuilder<Color?>(
+            tween: ColorTween(end: c2),
+            duration: const Duration(milliseconds: 400),
+            builder: (context, animC2, _) => CustomPaint(
+              painter: _HexPainter(color1: animC1 ?? c1, color2: animC2 ?? c2),
+              child: Center(
+                child: Assets.images.logo.svg(
+                  width: 68,
+                  height: 68,
+                  colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (extStatus.isActive) {
+      hexButton = hexButton
+          .animate(onPlay: (c) => c.repeat(reverse: true))
+          .scaleXY(begin: 0.93, end: 1.0, duration: 850.ms, curve: Curves.easeInOut);
+    }
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // CircleDesignWidget(newButtonColor: newButtonColor, onTap: onTap, animated: animated),
         Semantics(
           button: true,
           enabled: enabled,
           label: label,
-          child: Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(blurRadius: 16, color: buttonColor.withValues(alpha: .5))],
-            ),
-            width: 148,
-            height: 148,
-            child: Material(
-              key: const ValueKey("home_connection_button"),
-              shape: const CircleBorder(),
-              color: Colors.white,
-              child: InkWell(
-                focusColor: Colors.grey,
-                onTap: onTap,
-                child: Padding(
-                  padding: const EdgeInsets.all(36),
-                  child: TweenAnimationBuilder(
-                    tween: ColorTween(end: buttonColor),
-                    duration: const Duration(milliseconds: 250),
-                    builder: (context, value, child) {
-                      if (useImage) {
-                        return image.image();
-                      } else {
-                        return Assets.images.logo.svg(colorFilter: ColorFilter.mode(value!, BlendMode.srcIn));
-                      }
-                    },
-                  ),
-                ),
-              ),
-            ).animate(target: enabled ? 0 : 1).blurXY(end: 1),
-          ).animate(target: enabled ? 0 : 1).scaleXY(end: .88, curve: Curves.easeIn),
+          child: hexButton,
         ),
         const Gap(16),
         ExcludeSemantics(
@@ -256,14 +169,13 @@ class _ConnectionButton extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // const Gap(8),
                     FaIcon(FontAwesomeIcons.shieldHalved, size: 16, color: Theme.of(context).colorScheme.secondary),
                     const Gap(4),
                     Text(
                       secureLabel,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.secondary),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
                     ),
                   ],
                 ),
@@ -274,4 +186,60 @@ class _ConnectionButton extends StatelessWidget {
       ],
     );
   }
+}
+
+class _HexPainter extends CustomPainter {
+  final Color color1;
+  final Color color2;
+
+  const _HexPainter({required this.color1, required this.color2});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    // Leave 8px margin for the glow shadow to not get clipped
+    final r = size.width / 2 - 8;
+    final path = _hexPath(cx, cy, r);
+
+    // Glow shadow
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color1.withValues(alpha: 0.45)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
+    );
+
+    // Gradient fill
+    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: r);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [color1, color2],
+        ).createShader(rect),
+    );
+  }
+
+  Path _hexPath(double cx, double cy, double r) {
+    final path = Path();
+    for (int i = 0; i < 6; i++) {
+      // Pointy-top hexagon: first vertex at top (-90°)
+      final angle = (i * 60 - 90) * math.pi / 180;
+      final x = cx + r * math.cos(angle);
+      final y = cy + r * math.sin(angle);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldRepaint(_HexPainter old) => old.color1 != color1 || old.color2 != color2;
 }

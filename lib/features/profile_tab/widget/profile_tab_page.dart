@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
+import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
 import 'package:hiddify/features/backend/backend_api_provider.dart';
 import 'package:hiddify/features/backend_update/model/backend_update_state.dart';
 import 'package:hiddify/features/backend_update/notifier/backend_update_notifier.dart';
@@ -145,18 +146,11 @@ class _PromoDialogState extends ConsumerState<_PromoDialog> {
       final dio = ref.read(backendDioProvider);
       await dio.post('/promo/activate', data: {'code': code});
 
-      try {
-        await ref.read(vpnAutoInitProvider.notifier).switchServer(1);
-      } catch (_) {}
-
       if (!context.mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Подписка активирована! VPN готов к подключению'),
-          duration: Duration(seconds: 3),
-        ),
-      );
+      // Navigate to home tab and trigger automatic VPN connection
+      rootNavKey.currentContext?.goNamed('home');
+      ref.read(vpnAutoInitProvider.notifier).activateAndConnect();
     } catch (e) {
       String msg = 'Ошибка соединения с сервером';
       try {

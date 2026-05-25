@@ -57,6 +57,36 @@ class VpnAutoInitNotifier extends AsyncNotifier<void> {
     });
   }
 
+  /// Activate subscription: fetch config, set profile active, connect VPN.
+  /// Called after promo code or first subscription purchase.
+  Future<void> activateAndConnect() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final vlessUrl = await ref.read(backendServiceProvider).fetchVlessConfig(serverId: 1);
+      final repo = await ref.read(profileRepositoryProvider.future);
+      final dataSource = ref.read(profileDataSourceProvider);
+
+      final existing = await dataSource.getByName('DevOmnix VPN');
+      final String profileId;
+      if (existing != null) {
+        final entity = existing.toEntity();
+        await repo.offlineUpdate(entity, vlessUrl).run();
+        profileId = entity.id;
+      } else {
+        await repo.addLocal(
+          vlessUrl,
+          userOverride: const UserOverride(name: 'DevOmnix VPN'),
+        ).run();
+        final added = await dataSource.getByName('DevOmnix VPN');
+        if (added == null) return;
+        profileId = added.toEntity().id;
+      }
+
+      await repo.setAsActive(profileId).run();
+      await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+    });
+  }
+
   /// Re-fetch VLESS config from backend and update local profile.
   Future<void> refresh() async {
     state = const AsyncLoading();
