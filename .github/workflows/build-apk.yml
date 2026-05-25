@@ -42,6 +42,15 @@ jobs:
           storeFile=../devomnix.jks
           EOF
 
+      - name: Download hiddify-core AAR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download core-v1 \
+            --repo Den4ik250/DevOmnixVPNapp \
+            --pattern "hiddify-core.aar" \
+            --dir android/app/libs/
+
       - name: Get dependencies
         run: flutter pub get
 
