@@ -1,19 +1,27 @@
+import 'dart:typed_data';
+
 import 'package:dartx/dartx.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
 import 'package:devomnix/core/app_info/app_info_provider.dart';
 import 'package:devomnix/core/localization/translations.dart';
+import 'package:devomnix/core/preferences/general_preferences.dart';
+import 'package:devomnix/features/home/notifier/installed_apps_provider.dart';
 import 'package:devomnix/features/home/notifier/vpn_auto_init_notifier.dart';
+import 'package:devomnix/features/home/widget/app_picker_sheet.dart';
 import 'package:devomnix/features/home/widget/connection_button.dart';
 import 'package:devomnix/features/home/widget/promo_banner.dart';
 import 'package:devomnix/features/home/widget/server_picker_sheet.dart';
-import 'package:devomnix/features/home/widget/split_tunnel_card.dart';
 import 'package:devomnix/features/home/widget/speed_indicator.dart';
+import 'package:devomnix/features/per_app_proxy/data/app_proxy_data_source.dart';
+import 'package:devomnix/features/per_app_proxy/data/selected_data_provider.dart';
+import 'package:devomnix/features/per_app_proxy/model/per_app_proxy_mode.dart';
 import 'package:devomnix/features/proxy/active/active_proxy_card.dart';
 import 'package:devomnix/features/proxy/active/active_proxy_delay_indicator.dart';
 import 'package:devomnix/gen/assets.gen.dart';
+import 'package:devomnix/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:sliver_tools/sliver_tools.dart';
 
 class HomePage extends HookConsumerWidget {
   const HomePage({super.key});
@@ -23,8 +31,11 @@ class HomePage extends HookConsumerWidget {
     final theme = Theme.of(context);
     final t = ref.watch(translationsProvider).requireValue;
 
-    // Trigger auto-init on mount (silently fetches VLESS config if no profile).
+    // Trigger auto-init on mount.
     ref.watch(vpnAutoInitProvider);
+
+    final mode = ref.watch(Preferences.perAppProxyMode);
+    final isProxy = mode == PerAppProxyMode.include;
 
     return Scaffold(
       appBar: AppBar(
@@ -36,66 +47,114 @@ class HomePage extends HookConsumerWidget {
               TextSpan(
                 children: [
                   TextSpan(text: t.common.appTitle),
-                  const TextSpan(text: " "),
-                  const WidgetSpan(child: AppVersionLabel(), alignment: PlaceholderAlignment.middle),
+                  const TextSpan(text: ' '),
+                  const WidgetSpan(
+                    child: AppVersionLabel(),
+                    alignment: PlaceholderAlignment.middle,
+                  ),
                 ],
               ),
             ),
           ],
         ),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: const AssetImage('assets/images/world_map.png'),
-            fit: BoxFit.cover,
-            opacity: 0.09,
-            colorFilter: theme.brightness == Brightness.dark
-                ? ColorFilter.mode(Colors.white.withValues(alpha: .15), BlendMode.srcIn)
-                : ColorFilter.mode(Colors.grey.withValues(alpha: 1), BlendMode.srcATop),
-          ),
-        ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: CustomScrollView(
-              slivers: [
-                MultiSliver(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── 1. Promo banner (phone not confirmed) ──────────────────
+              const PromoBanner(),
+
+              // ── 2. VPN / Proxy toggle ──────────────────────────────────
+              if (PlatformUtils.isAndroid)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: _VpnProxyToggle(isProxy: isProxy, ref: ref),
+                ),
+
+              // ── 3. Center area: world map bg + connection button ───────
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    const PromoBanner(),
-                    const SplitTunnelCard(),
-                    SliverFillRemaining(
-                      hasScrollBody: false,
+                    // World map background
+                    Image.asset(
+                      'assets/images/world_map.png',
+                      fit: BoxFit.cover,
+                      color: theme.brightness == Brightness.dark
+                          ? Colors.white.withValues(alpha: .15)
+                          : Colors.grey.withValues(alpha: 1),
+                      colorBlendMode: theme.brightness == Brightness.dark
+                          ? BlendMode.srcIn
+                          : BlendMode.srcATop,
+                      opacity: const AlwaysStoppedAnimation(0.09),
+                    ),
+
+                    // Connection button + server picker centered
+                    const Center(
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                ConnectionButton(),
-                                Gap(12),
-                                _ServerPickerButton(),
-                                SpeedIndicator(),
-                                ActiveProxyDelayIndicator(),
-                              ],
-                            ),
-                          ),
-                          ActiveProxyFooter(),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ConnectionButton(),
+                          Gap(16),
+                          _ServerPickerButton(),
+                          SpeedIndicator(),
+                          ActiveProxyDelayIndicator(),
                         ],
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+
+              // ── 4. Proxy apps block (Android, proxy mode only) ─────────
+              if (PlatformUtils.isAndroid && isProxy)
+                const _ProxyAppsSection(),
+
+              // ── 5. Active proxy footer ─────────────────────────────────
+              const ActiveProxyFooter(),
+            ],
           ),
         ),
       ),
     );
   }
 }
+
+// ── VPN / Proxy segmented toggle ──────────────────────────────────────────────
+
+class _VpnProxyToggle extends StatelessWidget {
+  const _VpnProxyToggle({required this.isProxy, required this.ref});
+
+  final bool isProxy;
+  final WidgetRef ref;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<PerAppProxyMode>(
+      segments: const [
+        ButtonSegment(
+          value: PerAppProxyMode.off,
+          icon: Icon(Icons.vpn_lock_rounded),
+          label: Text('VPN'),
+        ),
+        ButtonSegment(
+          value: PerAppProxyMode.include,
+          icon: Icon(Icons.apps_outlined),
+          label: Text('Прокси'),
+        ),
+      ],
+      selected: {isProxy ? PerAppProxyMode.include : PerAppProxyMode.off},
+      onSelectionChanged: (modes) async {
+        await ref.read(Preferences.perAppProxyMode.notifier).update(modes.first);
+      },
+    );
+  }
+}
+
+// ── Server picker button ───────────────────────────────────────────────────────
 
 class _ServerPickerButton extends ConsumerWidget {
   const _ServerPickerButton();
@@ -104,28 +163,27 @@ class _ServerPickerButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final switching = ref.watch(vpnAutoInitProvider).isLoading;
     final selectedId = ref.watch(selectedServerIdProvider);
-
-    // Build label showing selected server flag if known
     final serversAsync = ref.watch(vpnServersProvider);
+
     String label = 'Выбрать сервер';
     if (serversAsync case AsyncData(value: final servers) when servers.isNotEmpty) {
-      final server = servers.isEmpty
-          ? null
-          : servers.firstWhere(
-              (s) => s['id'] == selectedId,
-              orElse: () => servers.first,
-            );
-      if (server != null) {
-        final flag = server['flag'] as String? ?? '';
-        final country = server['country'] as String? ?? server['name'] as String;
-        label = '$flag $country';
-      }
+      final server = servers.firstWhere(
+        (s) => s['id'] == selectedId,
+        orElse: () => servers.first,
+      );
+      final flag = server['flag'] as String? ?? '';
+      final country = server['country'] as String? ?? server['name'] as String;
+      label = '$flag $country';
     }
 
     return OutlinedButton.icon(
       onPressed: switching ? null : () => showServerPickerSheet(context),
       icon: switching
-          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+          ? const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
           : const Icon(Icons.public_rounded, size: 16),
       label: Text(label),
       style: OutlinedButton.styleFrom(
@@ -136,6 +194,189 @@ class _ServerPickerButton extends ConsumerWidget {
     );
   }
 }
+
+// ── Proxy apps section (bottom panel) ─────────────────────────────────────────
+
+class _ProxyAppsSection extends ConsumerWidget {
+  const _ProxyAppsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final selectedPkgs = ref.watch(Preferences.includeApps);
+    final appsMap = ref.watch(installedUserAppsProvider).valueOrNull ?? {};
+    final appsSource = ref.read(appProxyDataSourceProvider);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      constraints: const BoxConstraints(maxHeight: 210),
+      child: Card(
+        elevation: 0,
+        color: theme.colorScheme.surfaceContainer,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+              child: Row(
+                children: [
+                  Icon(Icons.shield_outlined,
+                      size: 16, color: theme.colorScheme.primary),
+                  const Gap(6),
+                  Text(
+                    'Приложения через прокси',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (selectedPkgs.isNotEmpty) ...[
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${selectedPkgs.length}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const Divider(height: 1),
+
+            // App list or empty hint
+            if (selectedPkgs.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text(
+                  'Добавьте приложения — их трафик пойдёт через прокси,\nостальное напрямую.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  children: selectedPkgs
+                      .map(
+                        (pkg) => _AppRow(
+                          packageName: pkg,
+                          appName: appsMap[pkg]?.name,
+                          icon: appsMap[pkg]?.icon,
+                          onRemove: () => appsSource.updatePkg(
+                            pkg: pkg,
+                            mode: AppProxyMode.include,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+
+            const Divider(height: 1),
+
+            // Add button
+            TextButton.icon(
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (_) => const AppPickerSheet(),
+              ),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Добавить приложение'),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 250.ms).slideY(begin: 0.06);
+  }
+}
+
+class _AppRow extends StatelessWidget {
+  const _AppRow({
+    required this.packageName,
+    this.appName,
+    this.icon,
+    required this.onRemove,
+  });
+
+  final String packageName;
+  final String? appName;
+  final Uint8List? icon;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.only(left: 16, right: 4),
+      leading: icon != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.memory(
+                icon!,
+                width: 32,
+                height: 32,
+                cacheWidth: 32,
+                cacheHeight: 32,
+              ),
+            )
+          : Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.android_rounded,
+                  size: 18, color: theme.colorScheme.onSurfaceVariant),
+            ),
+      title: Text(
+        appName ?? packageName,
+        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: appName != null
+          ? Text(
+              packageName,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            )
+          : null,
+      trailing: IconButton(
+        icon: const Icon(Icons.close_rounded, size: 18),
+        onPressed: onRemove,
+        tooltip: 'Убрать',
+        color: theme.colorScheme.error,
+      ),
+    );
+  }
+}
+
+// ── App version label in AppBar ────────────────────────────────────────────────
 
 class AppVersionLabel extends HookConsumerWidget {
   const AppVersionLabel({super.key});
@@ -158,7 +399,8 @@ class AppVersionLabel extends HookConsumerWidget {
         child: Text(
           version,
           textDirection: TextDirection.ltr,
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSecondaryContainer),
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.onSecondaryContainer),
         ),
       ),
     );
