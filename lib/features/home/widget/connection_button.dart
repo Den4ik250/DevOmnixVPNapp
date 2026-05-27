@@ -10,6 +10,7 @@ import 'package:devomnix/core/widget/animated_text.dart';
 import 'package:devomnix/features/connection/model/connection_status.dart';
 import 'package:devomnix/features/connection/model/extended_connection_status.dart';
 import 'package:devomnix/features/connection/notifier/connection_notifier.dart';
+import 'package:devomnix/features/home/notifier/vpn_auto_init_notifier.dart';
 import 'package:devomnix/features/profile/notifier/active_profile_notifier.dart';
 import 'package:devomnix/features/proxy/active/active_proxy_notifier.dart';
 import 'package:devomnix/features/settings/data/config_option_repository.dart';
@@ -54,9 +55,16 @@ class ConnectionButton extends HookConsumerWidget {
         },
         AsyncData(value: Disconnected()) || AsyncError() => () async {
           if (ref.read(activeProfileProvider).valueOrNull == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Нет активной подписки. Перейдите в раздел Тарифы.')),
-            );
+            // Профиля нет локально — проверяем бэкенд
+            final hasSub = await ref.read(subscriptionStatusProvider.future);
+            if (!hasSub) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Нет активной подписки. Перейдите в раздел Тарифы.')),
+              );
+              return;
+            }
+            // Подписка есть — скачиваем конфиг и активируем
+            await ref.read(vpnAutoInitProvider.notifier).activateAndConnect();
             return;
           }
           if (await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {

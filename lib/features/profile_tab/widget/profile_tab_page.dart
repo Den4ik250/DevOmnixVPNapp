@@ -172,6 +172,9 @@ class _AccountHeader extends ConsumerWidget {
     final theme = Theme.of(context);
     final meAsync = ref.watch(_meProvider);
 
+    // Используем централизованный subscriptionStatusProvider
+    final subStatus = ref.watch(subscriptionStatusProvider);
+
     return Container(
       padding: const EdgeInsets.all(24),
       child: Row(
@@ -196,10 +199,18 @@ class _AccountHeader extends ConsumerWidget {
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const Gap(2),
-                  Text(
-                    me['has_active_sub'] == true ? 'Подписка активна' : 'Нет активной подписки',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: me['has_active_sub'] == true ? Colors.green : theme.colorScheme.error,
+                  // Статус берём из единого provider
+                  subStatus.when(
+                    data: (isActive) => Text(
+                      isActive ? 'Подписка активна' : 'Нет активной подписки',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: isActive ? Colors.green : theme.colorScheme.error,
+                      ),
+                    ),
+                    loading: () => Text('...', style: theme.textTheme.bodySmall),
+                    error: (_, __) => Text(
+                      'Нет активной подписки',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
                     ),
                   ),
                 ],

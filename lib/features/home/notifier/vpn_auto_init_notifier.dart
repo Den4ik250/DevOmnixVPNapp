@@ -1,3 +1,4 @@
+import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend/backend_service.dart';
 import 'package:devomnix/features/connection/notifier/connection_notifier.dart';
 import 'package:devomnix/features/profile/data/profile_data_mapper.dart';
@@ -5,6 +6,19 @@ import 'package:devomnix/features/profile/data/profile_data_providers.dart';
 import 'package:devomnix/features/profile/model/profile_entity.dart';
 import 'package:devomnix/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+// ─── Централизованный статус подписки ────────────────────────────────────────
+// Единый источник правды: оба экрана (кнопка и профиль) используют этот provider.
+final subscriptionStatusProvider = FutureProvider.autoDispose<bool>((ref) async {
+  try {
+    final dio = ref.watch(backendDioProvider);
+    final r = await dio.get('/auth/me');
+    final data = Map<String, dynamic>.from(r.data as Map);
+    return data['has_active_sub'] == true;
+  } catch (_) {
+    return false;
+  }
+});
 
 /// Silently fetches a VLESS config from the backend on first launch
 /// (when no profile exists). Also handles server switching.
@@ -16,23 +30,49 @@ class VpnAutoInitNotifier extends AsyncNotifier<void> {
 
   Future<void> _initIfNeeded() async {
     try {
-      final hasProfile = await ref.read(hasAnyProfileProvider.future);
-      if (hasProfile) return;
-      await _addProfileFromBackend();
+      final activeProfile = await ref.read(activeProfileProvider.future);
+      if (activeProfile != null) return; // уже есть активный профиль
+
+      // Проверяем бэкенд — есть ли активная подписка
+      final hasActiveSub = await ref.read(subscriptionStatusProvider.future);
+      if (!hasActiveSub) return; // нет подписки — молча выходим
+
+      await _addAndActivateProfileFromBackend();
     } catch (_) {
-      // Silent fail — user may have no subscription or backend may be offline
+      // Silent fail — backend may be offline
     }
   }
 
-  Future<bool> _addProfileFromBackend({int? serverId}) async {
+  /// Добавляет профиль и сразу делает его активным.
+  Future<bool> _addAndActivateProfileFromBackend({int? serverId}) async {
     final vlessUrl = await ref.read(backendServiceProvider).fetchVlessConfig(serverId: serverId);
     final repo = await ref.read(profileRepositoryProvider.future);
-    final result = await repo.addLocal(
-      vlessUrl,
-      userOverride: const UserOverride(name: 'DevOmnix VPN'),
-    ).run();
-    return result.isRight();
+    final dataSource = ref.read(profileDataSourceProvider);
+
+    final existing = await dataSource.getByName('DevOmnix VPN');
+    final String profileId;
+    if (existing != null) {
+      final entity = existing.toEntity();
+      await repo.offlineUpdate(entity, vlessUrl).run();
+      profileId = entity.id;
+    } else {
+      final result = await repo.addLocal(
+        vlessUrl,
+        userOverride: const UserOverride(name: 'DevOmnix VPN'),
+      ).run();
+      if (result.isLeft()) return false;
+      final added = await dataSource.getByName('DevOmnix VPN');
+      if (added == null) return false;
+      profileId = added.toEntity().id;
+    }
+
+    await repo.setAsActive(profileId).run();
+    return true;
   }
+
+  // Оставляем для обратной совместимости
+  Future<bool> _addProfileFromBackend({int? serverId}) =>
+      _addAndActivateProfileFromBackend(serverId: serverId);
 
   /// Switch to a different server: update profile content, reconnect if needed.
   Future<void> switchServer(int serverId) async {
