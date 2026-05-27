@@ -144,28 +144,17 @@ jobs:
 
       - name: Update appcast.xml
         run: |
-          VERSION=${{ steps.version.outputs.tag }}
-          DATE=$(date -u "+%a, %d %b %Y %H:%M:%S +0000")
-          cat > appcast.xml <<EOF
-          <?xml version="1.0" encoding="utf-8"?>
-          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
-              <channel>
-                  <title>DevOmnix VPN</title>
-                  <item>
-                      <title>Version ${VERSION#v}</title>
-                      <pubDate>$DATE</pubDate>
-                      <enclosure
-                          url="https://github.com/Den4ik250/DevOmnixVPNapp/releases/download/$VERSION/app-release.apk"
-                          sparkle:version="${VERSION#v}" sparkle:os="android" />
-                  </item>
-              </channel>
-          </rss>
-          EOF
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          VERSION=${GITHUB_REF#refs/tags/v}
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git fetch origin main
+          git checkout main
+          git pull origin main --rebase
+          sed -i "s|<enclosure url=\"[^\"]*\"|<enclosure url=\"https://github.com/${{ github.repository }}/releases/download/v${VERSION}/app-arm64-v8a-release.apk\"|g" appcast.xml
+          sed -i "s|sparkle:version=\"[^\"]*\"|sparkle:version=\"${VERSION}\"|g" appcast.xml
           git add appcast.xml
-          git diff --cached --quiet || git commit -m "chore: update appcast.xml to $VERSION [skip ci]"
-          git push origin HEAD:main
+          git commit -m "chore: update appcast.xml to v${VERSION} [skip ci]" || echo "Nothing to commit"
+          git push origin main
 
       - name: Notify backend — set new version
         run: |
