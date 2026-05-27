@@ -101,6 +101,18 @@ jobs:
               print(f"Patched: {gen}")
           PYEOF
 
+      - name: Patch installed_apps (FLAG_UPDATED_SYSTEM_APP fix)
+        run: |
+          PLUGIN_KT=$(find ~/.pub-cache -path "*/installed_apps*/InstalledAppsPlugin.kt" | head -1)
+          if [ -n "$PLUGIN_KT" ]; then
+            sed -i \
+              's/(appInfo\.flags and ApplicationInfo\.FLAG_SYSTEM) != 0/(appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 \&\& (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0/' \
+              "$PLUGIN_KT"
+            echo "Patched: $PLUGIN_KT"
+          else
+            echo "installed_apps plugin not found, skipping patch"
+          fi
+
       - name: Generate code (build_runner)
         run: dart run build_runner build --delete-conflicting-outputs
 
