@@ -704,10 +704,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_svg
-      sha256: c200fd79c918a40c5cd50ea0877fa13f81bdaf6f0a5d3dbcc2a13e3285d6aa1b
+      sha256: "35882981abcbfb8c15b286f0cd690ff25bac12d95eff3e25ee207f37d4c42e7f"
       url: "https://pub.dev"
     source: hosted
-    version: "2.0.17"
+    version: "2.3.0"
   flutter_test:
     dependency: transitive
     description: flutter
@@ -2032,10 +2032,10 @@ packages:
     dependency: transitive
     description:
       name: vector_graphics
-      sha256: "44cc7104ff32563122a929e4620cf3efd584194eec6d1d913eb5ba593dbcf6de"
+      sha256: "2306c03da2ba81724afeb589c351ebbc0aa7d86005925be8f8735856dbe5e42d"
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.18"
+    version: "1.2.2"
   vector_graphics_codec:
     dependency: transitive
     description:
@@ -2166,4 +2166,4 @@ packages:
     version: "2.2.2"
 sdks:
   dart: ">=3.10.4 <3.13.0-z"
-  flutter: ">=3.38.5 <4.0.0"
+  flutter: ">=3.38.5"
