@@ -1,6 +1,6 @@
-package com.hiddify.hiddify;
+package com.devomnix.vpn;
 
-import com.hiddify.hiddify.IServiceCallback;
+import com.devomnix.vpn.IServiceCallback;
 
 interface IService {
   int getStatus();
