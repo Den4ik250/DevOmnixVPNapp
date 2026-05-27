@@ -138,3 +138,41 @@ jobs:
           generate_release_notes: false
           body: |
             DevOmnix VPN ${{ steps.version.outputs.tag }}
+
+      - name: Update appcast.xml
+        run: |
+          VERSION=${{ steps.version.outputs.tag }}
+          DATE=$(date -u "+%a, %d %b %Y %H:%M:%S +0000")
+          cat > appcast.xml <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+              <channel>
+                  <title>DevOmnix VPN</title>
+                  <item>
+                      <title>Version ${VERSION#v}</title>
+                      <pubDate>$DATE</pubDate>
+                      <enclosure
+                          url="https://github.com/Den4ik250/DevOmnixVPNapp/releases/download/$VERSION/app-release.apk"
+                          sparkle:version="${VERSION#v}" sparkle:os="android" />
+                  </item>
+              </channel>
+          </rss>
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git diff --cached --quiet || git commit -m "chore: update appcast.xml to $VERSION [skip ci]"
+          git push origin HEAD:main
+
+      - name: Notify backend — set new version
+        run: |
+          VERSION=${{ steps.version.outputs.tag }}
+          # Убираем префикс "v" → "1.2.6"
+          VERSION_NUM=${VERSION#v}
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X POST https://78.17.100.87/admin/set-version \
+            -H "Authorization: Bearer ${{ secrets.ADMIN_SECRET_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"version\": \"$VERSION_NUM\"}" \
+          | grep -q "^200$" && echo "✅ Backend version updated to $VERSION_NUM" \
+            || echo "⚠️  Backend update failed (non-critical, check manually)"
