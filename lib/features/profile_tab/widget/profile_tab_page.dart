@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hiddify/core/app_info/app_info_provider.dart';
-import 'package:hiddify/core/router/go_router/go_router_notifier.dart';
-import 'package:hiddify/features/backend/backend_api_provider.dart';
-import 'package:hiddify/features/backend_update/model/backend_update_state.dart';
-import 'package:hiddify/features/backend_update/notifier/backend_update_notifier.dart';
-import 'package:hiddify/features/home/notifier/vpn_auto_init_notifier.dart';
+import 'package:devomnix/core/app_info/app_info_provider.dart';
+import 'package:devomnix/core/router/go_router/go_router_notifier.dart';
+import 'package:devomnix/features/backend/backend_api_provider.dart';
+import 'package:devomnix/features/backend_update/model/backend_update_state.dart';
+import 'package:devomnix/features/backend_update/notifier/backend_update_notifier.dart';
+import 'package:devomnix/features/home/notifier/vpn_auto_init_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 

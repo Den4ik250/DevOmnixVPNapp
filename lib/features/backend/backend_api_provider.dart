@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:hiddify/core/model/constants.dart';
-import 'package:hiddify/core/preferences/general_preferences.dart';
+import 'package:devomnix/core/model/constants.dart';
+import 'package:devomnix/core/preferences/general_preferences.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Dio instance pre-configured with JWT bearer token.

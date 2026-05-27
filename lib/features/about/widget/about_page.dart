@@ -2,17 +2,17 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
-import 'package:hiddify/core/app_info/app_info_provider.dart';
-import 'package:hiddify/core/directories/directories_provider.dart';
-import 'package:hiddify/core/localization/translations.dart';
-import 'package:hiddify/core/model/constants.dart';
-import 'package:hiddify/core/model/failures.dart';
-import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
-import 'package:hiddify/core/widget/adaptive_icon.dart';
-import 'package:hiddify/features/app_update/notifier/app_update_notifier.dart';
-import 'package:hiddify/features/app_update/notifier/app_update_state.dart';
-import 'package:hiddify/gen/assets.gen.dart';
-import 'package:hiddify/utils/utils.dart';
+import 'package:devomnix/core/app_info/app_info_provider.dart';
+import 'package:devomnix/core/directories/directories_provider.dart';
+import 'package:devomnix/core/localization/translations.dart';
+import 'package:devomnix/core/model/constants.dart';
+import 'package:devomnix/core/model/failures.dart';
+import 'package:devomnix/core/router/dialog/dialog_notifier.dart';
+import 'package:devomnix/core/widget/adaptive_icon.dart';
+import 'package:devomnix/features/app_update/notifier/app_update_notifier.dart';
+import 'package:devomnix/features/app_update/notifier/app_update_state.dart';
+import 'package:devomnix/gen/assets.gen.dart';
+import 'package:devomnix/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class AboutPage extends HookConsumerWidget {

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
-import 'package:hiddify/features/auth/notifier/auth_notifier.dart';
+import 'package:devomnix/features/auth/notifier/auth_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class SmsCodePage extends ConsumerStatefulWidget {

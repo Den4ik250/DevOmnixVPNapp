@@ -1,6 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hiddify/core/localization/translations.dart';
-import 'package:hiddify/features/connection/model/connection_failure.dart';
+import 'package:devomnix/core/localization/translations.dart';
+import 'package:devomnix/features/connection/model/connection_failure.dart';
 
 part 'connection_status.freezed.dart';
 

@@ -1,17 +1,17 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:hiddify/core/haptic/haptic_service.dart';
-import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/core/utils/throttler.dart';
-import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
-import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
-import 'package:hiddify/features/proxy/model/ip_info_entity.dart' as oldipinfo;
-import 'package:hiddify/features/proxy/model/proxy_failure.dart';
-import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
-import 'package:hiddify/hiddifycore/init_signal.dart';
-import 'package:hiddify/utils/riverpod_utils.dart';
-import 'package:hiddify/utils/utils.dart';
+import 'package:devomnix/core/haptic/haptic_service.dart';
+import 'package:devomnix/core/preferences/general_preferences.dart';
+import 'package:devomnix/core/utils/throttler.dart';
+import 'package:devomnix/features/connection/notifier/connection_notifier.dart';
+import 'package:devomnix/features/proxy/data/proxy_data_providers.dart';
+import 'package:devomnix/features/proxy/model/ip_info_entity.dart' as oldipinfo;
+import 'package:devomnix/features/proxy/model/proxy_failure.dart';
+import 'package:devomnix/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:devomnix/hiddifycore/init_signal.dart';
+import 'package:devomnix/utils/riverpod_utils.dart';
+import 'package:devomnix/utils/utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'active_proxy_notifier.g.dart';

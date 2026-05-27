@@ -1,9 +1,9 @@
-import 'package:hiddify/features/backend/backend_service.dart';
-import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
-import 'package:hiddify/features/profile/data/profile_data_mapper.dart';
-import 'package:hiddify/features/profile/data/profile_data_providers.dart';
-import 'package:hiddify/features/profile/model/profile_entity.dart';
-import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:devomnix/features/backend/backend_service.dart';
+import 'package:devomnix/features/connection/notifier/connection_notifier.dart';
+import 'package:devomnix/features/profile/data/profile_data_mapper.dart';
+import 'package:devomnix/features/profile/data/profile_data_providers.dart';
+import 'package:devomnix/features/profile/model/profile_entity.dart';
+import 'package:devomnix/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Silently fetches a VLESS config from the backend on first launch

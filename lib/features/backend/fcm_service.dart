@@ -12,7 +12,7 @@
 //
 // Until configured, this file is a no-op stub.
 
-import 'package:hiddify/features/backend/backend_api_provider.dart';
+import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 // TODO: uncomment after Firebase setup

@@ -1,8 +1,8 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
-import 'package:hiddify/features/connection/model/connection_status.dart';
-import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
-import 'package:hiddify/features/stats/notifier/stats_notifier.dart';
+import 'package:devomnix/features/connection/model/connection_status.dart';
+import 'package:devomnix/features/connection/notifier/connection_notifier.dart';
+import 'package:devomnix/features/stats/notifier/stats_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class SpeedIndicator extends ConsumerWidget {

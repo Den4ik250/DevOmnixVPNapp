@@ -1,5 +1,5 @@
-import 'package:hiddify/features/per_app_proxy/model/app_package_info.dart';
-import 'package:hiddify/utils/platform_utils.dart';
+import 'package:devomnix/features/per_app_proxy/model/app_package_info.dart';
+import 'package:devomnix/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:installed_apps/index.dart';
 

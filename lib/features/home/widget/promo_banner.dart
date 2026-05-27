@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
-import 'package:hiddify/features/auth/notifier/auth_notifier.dart';
-import 'package:hiddify/features/auth/widget/phone_auth_page.dart';
+import 'package:devomnix/features/auth/notifier/auth_notifier.dart';
+import 'package:devomnix/features/auth/widget/phone_auth_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Shown on the home screen when the user hasn't verified their phone yet.

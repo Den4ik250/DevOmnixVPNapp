@@ -3,13 +3,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
-import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/features/home/notifier/installed_apps_provider.dart';
-import 'package:hiddify/features/home/widget/app_picker_sheet.dart';
-import 'package:hiddify/features/per_app_proxy/data/app_proxy_data_source.dart';
-import 'package:hiddify/features/per_app_proxy/data/selected_data_provider.dart';
-import 'package:hiddify/features/per_app_proxy/model/per_app_proxy_mode.dart';
-import 'package:hiddify/utils/platform_utils.dart';
+import 'package:devomnix/core/preferences/general_preferences.dart';
+import 'package:devomnix/features/home/notifier/installed_apps_provider.dart';
+import 'package:devomnix/features/home/widget/app_picker_sheet.dart';
+import 'package:devomnix/features/per_app_proxy/data/app_proxy_data_source.dart';
+import 'package:devomnix/features/per_app_proxy/data/selected_data_provider.dart';
+import 'package:devomnix/features/per_app_proxy/model/per_app_proxy_mode.dart';
+import 'package:devomnix/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class SplitTunnelCard extends ConsumerWidget {

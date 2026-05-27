@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:hiddify/features/home/notifier/vpn_auto_init_notifier.dart';
+import 'package:devomnix/features/home/notifier/vpn_auto_init_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Bottom sheet for selecting a VPN server.

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hiddify/features/connection/model/connection_status.dart';
+import 'package:devomnix/features/connection/model/connection_status.dart';
 
 /// UI-level 8-state connection status.
 /// Maps from the core [ConnectionStatus] but adds intermediate phases

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:hiddify/core/model/constants.dart';
-import 'package:hiddify/features/backend_update/model/backend_update_state.dart';
+import 'package:devomnix/core/model/constants.dart';
+import 'package:devomnix/features/backend_update/model/backend_update_state.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:version/version.dart';

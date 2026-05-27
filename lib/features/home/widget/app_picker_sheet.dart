@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
-import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/features/home/notifier/installed_apps_provider.dart';
-import 'package:hiddify/features/per_app_proxy/data/app_proxy_data_source.dart';
-import 'package:hiddify/features/per_app_proxy/data/selected_data_provider.dart';
-import 'package:hiddify/features/per_app_proxy/model/app_package_info.dart';
-import 'package:hiddify/features/per_app_proxy/model/per_app_proxy_mode.dart';
+import 'package:devomnix/core/preferences/general_preferences.dart';
+import 'package:devomnix/features/home/notifier/installed_apps_provider.dart';
+import 'package:devomnix/features/per_app_proxy/data/app_proxy_data_source.dart';
+import 'package:devomnix/features/per_app_proxy/data/selected_data_provider.dart';
+import 'package:devomnix/features/per_app_proxy/model/app_package_info.dart';
+import 'package:devomnix/features/per_app_proxy/model/per_app_proxy_mode.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Bottom-sheet app picker for the split-tunnel (proxy) mode.

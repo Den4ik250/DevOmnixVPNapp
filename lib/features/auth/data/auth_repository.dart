@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:hiddify/core/model/constants.dart';
+import 'package:devomnix/core/model/constants.dart';
 
 class AuthResult {
   const AuthResult({

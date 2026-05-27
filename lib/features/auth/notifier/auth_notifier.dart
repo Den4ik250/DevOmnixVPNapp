@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:hiddify/core/preferences/general_preferences.dart';
-import 'package:hiddify/features/auth/data/auth_repository.dart';
+import 'package:devomnix/core/preferences/general_preferences.dart';
+import 'package:devomnix/features/auth/data/auth_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:uuid/uuid.dart';
 

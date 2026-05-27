@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
-import 'package:hiddify/core/model/constants.dart';
+import 'package:devomnix/core/model/constants.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _faqs = [
