@@ -23,19 +23,62 @@ class BackendUpdateWrapper extends HookConsumerWidget {
     }, const []);
 
     ref.listen<BackendUpdateState>(backendUpdateProvider, (prev, next) {
+      final ctx = navigatorKey.currentContext;
+      if (ctx == null || !ctx.mounted) return;
+
+      // Force update — non-dismissable dialog
       if (next.status == BackendUpdateStatus.forceUpdate &&
           prev?.status != BackendUpdateStatus.forceUpdate) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          final ctx = navigatorKey.currentContext;
-          if (ctx != null && ctx.mounted) {
-            _showForceUpdateDialog(ctx, next);
-          }
+          _showForceUpdateDialog(ctx, next);
+        });
+      }
+
+      // Soft update — banner at bottom
+      if (next.status == BackendUpdateStatus.softUpdate &&
+          prev?.status != BackendUpdateStatus.softUpdate) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showSoftUpdateSnackbar(ctx, next);
         });
       }
     });
 
     return child;
   }
+}
+
+void _showSoftUpdateSnackbar(BuildContext context, BackendUpdateState state) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      duration: const Duration(seconds: 10),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      content: Row(
+        children: [
+          const Icon(Icons.system_update_rounded, color: Colors.white, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Доступно обновление ${state.latestVersion}',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+      action: SnackBarAction(
+        label: 'Скачать',
+        onPressed: () {
+          if (state.downloadUrl.isNotEmpty) {
+            launchUrl(
+              Uri.parse(state.downloadUrl),
+              mode: LaunchMode.externalApplication,
+            );
+          }
+        },
+      ),
+    ),
+  );
 }
 
 void _showForceUpdateDialog(BuildContext context, BackendUpdateState state) {

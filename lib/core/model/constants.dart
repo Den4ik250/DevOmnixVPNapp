@@ -15,7 +15,7 @@ abstract class Constants {
   static const cfWarpTermsOfService = "https://www.cloudflare.com/application/terms/";
 
   // DevOmnix backend
-  static const backendBaseUrl = "http://78.17.100.87";
+  static const backendBaseUrl = "https://api.devomnix.com";
 }
 
 const kAnimationDuration = Duration(milliseconds: 250);
