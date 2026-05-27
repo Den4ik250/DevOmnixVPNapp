@@ -2,9 +2,13 @@ name: Build & Release APK
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (например v1.0.5)'
+        required: true
 
 jobs:
   build:
@@ -13,8 +17,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -82,8 +84,6 @@ jobs:
               print(f"Patched: {stub}")
 
           # 2. Patch icon_data.g.dart — replace "= SimpleIconData(0xHEX)" with IconData(...)
-          #    Handles both field-type variants: "const IconData X = SimpleIconData(...)"
-          #    and "const SimpleIconData X = SimpleIconData(...)"
           gen = os.path.join(base, "icon_data.g.dart")
           if os.path.exists(gen):
               with open(gen) as f:
@@ -95,7 +95,6 @@ jobs:
                   r"= IconData(0x\1, fontFamily: 'SimpleIcons', fontPackage: 'simple_icons');",
                   content,
               )
-              # Also fix field type declarations "const SimpleIconData X" → "const IconData X"
               content = content.replace("static const SimpleIconData ", "static const IconData ")
               with open(gen, "w") as f:
                   f.write(content)
@@ -121,7 +120,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
           files: build/app/outputs/flutter-apk/app-release.apk
           token: ${{ secrets.GITHUB_TOKEN }}
           generate_release_notes: false
