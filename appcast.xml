@@ -7,7 +7,7 @@
             <pubDate>Tue, 27 May 2026 00:00:00 +0000</pubDate>
             <enclosure
                 url="https://github.com/Den4ik250/DevOmnixVPNapp/releases/latest/download/app-release.apk"
-                sparkle:version="1.2.0" sparkle:os="android" />
+                sparkle:version="1.2.8" sparkle:os="android" />
         </item>
     </channel>
 </rss>
