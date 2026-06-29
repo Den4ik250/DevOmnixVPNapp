@@ -147,14 +147,28 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+
+          # Берём свежую main в отдельную рабочую копию, не трогая detached HEAD тега
           git fetch origin main
-          git checkout main
-          git pull origin main --rebase
+          git checkout -B main origin/main
+
+          # Обновляем appcast.xml
           sed -i "s|<enclosure url=\"[^\"]*\"|<enclosure url=\"https://github.com/${{ github.repository }}/releases/download/v${VERSION}/app-arm64-v8a-release.apk\"|g" appcast.xml
           sed -i "s|sparkle:version=\"[^\"]*\"|sparkle:version=\"${VERSION}\"|g" appcast.xml
-          git add appcast.xml
-          git commit -m "chore: update appcast.xml to v${VERSION} [skip ci]" || echo "Nothing to commit"
-          git push origin main
+
+          # Коммитим только если есть изменения
+          if git diff --quiet appcast.xml; then
+            echo "appcast.xml не изменился, пропускаем"
+          else
+            git add appcast.xml
+            git commit -m "chore: update appcast.xml to v${VERSION} [skip ci]"
+            # Повтор пуша с подтягиванием свежих изменений при гонке
+            for i in 1 2 3; do
+              git pull origin main --rebase && git push origin main && break
+              echo "Попытка $i не удалась, повтор..."
+              sleep 3
+            done
+          fi
 
       - name: Notify backend — set new version
         run: |
