@@ -464,6 +464,19 @@ class _ServersSection extends ConsumerWidget {
     );
     if (ok != true) return;
     final repo = await ref.read(profileRepositoryProvider.future);
+
+    if (profile.active) {
+      // Удаляем активный ручной профиль. DAO активировал бы profiles.first
+      // (произвольный) — вместо этого переключаемся на авто-профиль ДО удаления
+      // (один reconnect, без мигания). Если авто нет — fallback на логику DAO.
+      final ds = ref.read(profileDataSourceProvider);
+      final auto = await ds.getByName(kAutoProfileName);
+      if (auto != null) {
+        await repo.setAsActive(auto.toEntity().id).run();
+        await repo.deleteById(profile.id, false).run();
+        return;
+      }
+    }
     await repo.deleteById(profile.id, profile.active).run();
   }
 }
