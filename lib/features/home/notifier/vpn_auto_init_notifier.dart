@@ -7,6 +7,9 @@ import 'package:devomnix/features/profile/model/profile_entity.dart';
 import 'package:devomnix/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+/// Стабильное имя авто-профиля (от бэкенда) — отличает его от ручных серверов.
+const kAutoProfileName = 'DevOmnix VPN';
+
 // ─── Централизованный статус подписки ────────────────────────────────────────
 // Единый источник правды: оба экрана (кнопка и профиль) используют этот provider.
 final subscriptionStatusProvider = FutureProvider.autoDispose<bool>((ref) async {

@@ -4,6 +4,7 @@ import 'package:dartx/dartx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
+import 'package:go_router/go_router.dart';
 import 'package:devomnix/core/app_info/app_info_provider.dart';
 import 'package:devomnix/core/localization/translations.dart';
 import 'package:devomnix/core/preferences/general_preferences.dart';
@@ -12,12 +13,10 @@ import 'package:devomnix/features/home/notifier/vpn_auto_init_notifier.dart';
 import 'package:devomnix/features/home/widget/app_picker_sheet.dart';
 import 'package:devomnix/features/home/widget/connection_button.dart';
 import 'package:devomnix/features/home/widget/promo_banner.dart';
-import 'package:devomnix/features/home/widget/server_picker_sheet.dart';
 import 'package:devomnix/features/home/widget/speed_indicator.dart';
 import 'package:devomnix/features/per_app_proxy/data/app_proxy_data_source.dart';
 import 'package:devomnix/features/per_app_proxy/data/selected_data_provider.dart';
 import 'package:devomnix/features/per_app_proxy/model/per_app_proxy_mode.dart';
-import 'package:devomnix/features/proxy/active/active_proxy_card.dart';
 import 'package:devomnix/features/proxy/active/active_proxy_delay_indicator.dart';
 import 'package:devomnix/gen/assets.gen.dart';
 import 'package:devomnix/utils/platform_utils.dart';
@@ -99,9 +98,10 @@ class HomePage extends HookConsumerWidget {
                         children: [
                           ConnectionButton(),
                           Gap(16),
-                          _ServerPickerButton(),
                           SpeedIndicator(),
                           ActiveProxyDelayIndicator(),
+                          Gap(16),
+                          _DiagnosticsButton(),
                         ],
                       ),
                     ),
@@ -112,9 +112,6 @@ class HomePage extends HookConsumerWidget {
               // ── 4. Proxy apps block (Android, proxy mode only) ─────────
               if (PlatformUtils.isAndroid && isProxy)
                 const _ProxyAppsSection(),
-
-              // ── 5. Active proxy footer ─────────────────────────────────
-              const ActiveProxyFooter(),
             ],
           ),
         ),
@@ -154,38 +151,17 @@ class _VpnProxyToggle extends StatelessWidget {
   }
 }
 
-// ── Server picker button ───────────────────────────────────────────────────────
+// ── Diagnostics button ─────────────────────────────────────────────────────────
 
-class _ServerPickerButton extends ConsumerWidget {
-  const _ServerPickerButton();
+class _DiagnosticsButton extends StatelessWidget {
+  const _DiagnosticsButton();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final switching = ref.watch(vpnAutoInitProvider).isLoading;
-    final selectedId = ref.watch(selectedServerIdProvider);
-    final serversAsync = ref.watch(vpnServersProvider);
-
-    String label = 'Выбрать сервер';
-    if (serversAsync case AsyncData(value: final servers) when servers.isNotEmpty) {
-      final server = servers.firstWhere(
-        (s) => s['id'] == selectedId,
-        orElse: () => servers.first,
-      );
-      final flag = server['flag'] as String? ?? '';
-      final country = server['country'] as String? ?? server['name'] as String;
-      label = '$flag $country';
-    }
-
+  Widget build(BuildContext context) {
     return OutlinedButton.icon(
-      onPressed: switching ? null : () => showServerPickerSheet(context),
-      icon: switching
-          ? const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.public_rounded, size: 16),
-      label: Text(label),
+      onPressed: () => context.goNamed('diagnostics'),
+      icon: const Icon(Icons.network_check_rounded, size: 16),
+      label: const Text('Диагностика'),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         textStyle: const TextStyle(fontSize: 13),

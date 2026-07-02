@@ -6,7 +6,12 @@ import 'package:devomnix/core/router/go_router/go_router_notifier.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend_update/model/backend_update_state.dart';
 import 'package:devomnix/features/backend_update/notifier/backend_update_notifier.dart';
+import 'package:devomnix/core/router/bottom_sheets/bottom_sheets_notifier.dart';
 import 'package:devomnix/features/home/notifier/vpn_auto_init_notifier.dart';
+import 'package:devomnix/features/profile/data/profile_data_mapper.dart';
+import 'package:devomnix/features/profile/data/profile_data_providers.dart';
+import 'package:devomnix/features/profile/model/profile_entity.dart';
+import 'package:devomnix/features/profile/model/profile_sort_enum.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -21,6 +26,8 @@ class ProfileTabPage extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           _AccountHeader(ref: ref),
+          const Divider(height: 1),
+          const _ServersSection(),
           const Divider(height: 1),
           _ProfileSection(
             icon: Icons.credit_card_rounded,
@@ -344,4 +351,195 @@ void _showSoftUpdateDialog(BuildContext context, BackendUpdateState state) {
       ],
     ),
   );
+}
+
+// ── Серверы ─────────────────────────────────────────────────────────────────
+
+/// Список всех профилей (авто + ручные), обновляется при изменениях в БД.
+final allProfilesProvider = StreamProvider.autoDispose<List<ProfileEntity>>((ref) {
+  final ds = ref.watch(profileDataSourceProvider);
+  return ds
+      .watchAll(sort: ProfilesSort.lastUpdate, sortMode: SortMode.ascending)
+      .map((rows) => rows.map((e) => e.toEntity()).toList());
+});
+
+class _ServersSection extends ConsumerWidget {
+  const _ServersSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final profiles = ref.watch(allProfilesProvider).valueOrNull ?? const <ProfileEntity>[];
+
+    final autoList = profiles.where((p) => p.name == kAutoProfileName).toList();
+    final autoProfile = autoList.isEmpty ? null : autoList.first;
+    final manualProfiles = profiles.where((p) => p.name != kAutoProfileName).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+          child: Text(
+            'Серверы',
+            style: theme.textTheme.titleSmall
+                ?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
+          ),
+        ),
+
+        // Автоматический (наш платный) — удалить нельзя
+        _ServerTile(
+          title: 'Автоматический (наш сервер)',
+          subtitle: autoProfile != null
+              ? 'Основной платный сервер'
+              : 'Оформите подписку, чтобы получить сервер',
+          isActive: autoProfile?.active ?? false,
+          isAuto: true,
+          onSelect: () async {
+            if (autoProfile != null) {
+              await _select(ref, autoProfile);
+            } else {
+              await ref.read(vpnAutoInitProvider.notifier).refresh();
+            }
+          },
+        ),
+
+        // Мои серверы (ручные)
+        if (manualProfiles.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+            child: Text(
+              'Мои серверы',
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ...manualProfiles.map(
+          (p) => _ServerTile(
+            title: p.name,
+            isActive: p.active,
+            isAuto: false,
+            onSelect: () => _select(ref, p),
+            onDelete: () => _confirmDelete(context, ref, p),
+          ),
+        ),
+
+        // Добавить свой сервер
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: OutlinedButton.icon(
+            onPressed: () =>
+                ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Добавить свой сервер'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _select(WidgetRef ref, ProfileEntity profile) async {
+    if (profile.active) return;
+    final repo = await ref.read(profileRepositoryProvider.future);
+    await repo.setAsActive(profile.id).run();
+    // Переподключение при активном VPN делает ConnectionNotifier
+    // (слушатель activeProfileProvider → reconnect), вручную не нужно.
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, ProfileEntity profile) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить сервер?'),
+        content: Text('«${profile.name}» будет удалён из списка.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final repo = await ref.read(profileRepositoryProvider.future);
+    await repo.deleteById(profile.id, profile.active).run();
+  }
+}
+
+class _ServerTile extends StatelessWidget {
+  const _ServerTile({
+    required this.title,
+    this.subtitle,
+    required this.isActive,
+    required this.isAuto,
+    required this.onSelect,
+    this.onDelete,
+  });
+
+  final String title;
+  final String? subtitle;
+  final bool isActive;
+  final bool isAuto;
+  final VoidCallback onSelect;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      onTap: onSelect,
+      selected: isActive,
+      selectedTileColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.25),
+      leading: Icon(
+        isAuto ? Icons.cloud_done_rounded : Icons.dns_rounded,
+        color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+      ),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(fontWeight: isActive ? FontWeight.w700 : FontWeight.w500),
+            ),
+          ),
+          if (isAuto) ...[
+            const Gap(8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'авто',
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: theme.colorScheme.onPrimaryContainer),
+              ),
+            ),
+          ],
+        ],
+      ),
+      subtitle: subtitle != null ? Text(subtitle!) : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isActive)
+            Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary, size: 20)
+          else
+            TextButton(onPressed: onSelect, child: const Text('Выбрать')),
+          if (onDelete != null)
+            IconButton(
+              icon: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error, size: 20),
+              tooltip: 'Удалить',
+              onPressed: onDelete,
+            ),
+        ],
+      ),
+    );
+  }
 }
