@@ -127,7 +127,8 @@ jobs:
             VERSION="${GITHUB_REF_NAME}"
           fi
           VERSION_NUM="${VERSION#v}"
-          BUILD_NUM="${GITHUB_RUN_NUMBER}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NUM"
+          BUILD_NUM=$((MAJOR * 10000 + MINOR * 100 + PATCH))
           echo "Setting version to ${VERSION_NUM}+${BUILD_NUM}"
           sed -i "s/^version: .*/version: ${VERSION_NUM}+${BUILD_NUM}/" pubspec.yaml
           grep "^version:" pubspec.yaml
