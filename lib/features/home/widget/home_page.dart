@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:devomnix/core/app_info/app_info_provider.dart';
 import 'package:devomnix/core/localization/translations.dart';
 import 'package:devomnix/core/preferences/general_preferences.dart';
+import 'package:devomnix/features/backend_update/model/backend_update_state.dart';
+import 'package:devomnix/features/backend_update/notifier/backend_update_notifier.dart';
 import 'package:devomnix/features/home/notifier/installed_apps_provider.dart';
 import 'package:devomnix/features/home/notifier/vpn_auto_init_notifier.dart';
 import 'package:devomnix/features/home/widget/app_picker_sheet.dart';
@@ -359,22 +361,50 @@ class AppVersionLabel extends HookConsumerWidget {
     final theme = Theme.of(context);
     final version = ref.watch(appInfoProvider).requireValue.presentVersion;
     if (version.isBlank) return const SizedBox();
-    return Semantics(
+
+    // Постоянный индикатор обновления: держится, пока бэкенд сообщает версию
+    // новее установленной (soft/force). Тап → вкладка «Профиль».
+    final updateStatus = ref.watch(backendUpdateProvider).status;
+    final hasUpdate = updateStatus == BackendUpdateStatus.softUpdate ||
+        updateStatus == BackendUpdateStatus.forceUpdate;
+
+    final bg = hasUpdate ? Colors.red : theme.colorScheme.secondaryContainer;
+    final fg = hasUpdate ? Colors.white : theme.colorScheme.onSecondaryContainer;
+
+    final label = Semantics(
       label: t.common.version,
-      button: false,
+      button: hasUpdate,
       child: Container(
         decoration: BoxDecoration(
-          color: theme.colorScheme.secondaryContainer,
+          color: bg,
           borderRadius: BorderRadius.circular(4),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-        child: Text(
-          version,
-          textDirection: TextDirection.ltr,
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.onSecondaryContainer),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              version,
+              textDirection: TextDirection.ltr,
+              style: theme.textTheme.bodySmall?.copyWith(color: fg),
+            ),
+            if (hasUpdate) ...[
+              const SizedBox(width: 3),
+              Text(
+                '!',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: fg, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ],
         ),
       ),
+    );
+
+    if (!hasUpdate) return label;
+    return GestureDetector(
+      onTap: () => context.goNamed('profileTab'),
+      child: label,
     );
   }
 }
