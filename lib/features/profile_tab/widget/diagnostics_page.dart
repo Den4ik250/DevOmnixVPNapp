@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
+import 'package:devomnix/features/home/notifier/vpn_auto_init_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class DiagnosticsPage extends HookConsumerWidget {
@@ -159,9 +160,9 @@ class _ResetNotifier extends AutoDisposeAsyncNotifier<String?> {
   Future<void> reset() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final dio = ref.read(backendDioProvider);
-      final r = await dio.post('/vpn/reset');
-      return (r.data as Map<String, dynamic>)['vless_url'] as String?;
+      // Пересоздаёт конфиг на бэкенде, заменяет ТОЛЬКО авто-профиль,
+      // делает его активным и переподключается (если VPN включён).
+      return await ref.read(vpnAutoInitProvider.notifier).resetAndReconnect();
     });
   }
 }

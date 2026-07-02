@@ -24,6 +24,18 @@ class BackendService {
     return vlessUrl;
   }
 
+  /// Пересоздаёт клиента в 3X-UI (POST /vpn/reset) и возвращает свежий vless_url.
+  Future<String> resetVlessConfig() async {
+    final dio = _ref.read(backendDioProvider);
+    final response = await dio.post('/vpn/reset');
+    final data = response.data as Map<String, dynamic>;
+    final vlessUrl = data['vless_url'] as String?;
+    if (vlessUrl == null || vlessUrl.isEmpty) {
+      throw Exception('No VLESS config returned from /vpn/reset');
+    }
+    return vlessUrl;
+  }
+
   Future<List<Map<String, dynamic>>> fetchServers() async {
     final dio = _ref.read(backendDioProvider);
     final response = await dio.get('/vpn/servers');

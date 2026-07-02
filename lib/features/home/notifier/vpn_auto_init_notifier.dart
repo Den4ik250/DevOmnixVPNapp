@@ -52,7 +52,7 @@ class VpnAutoInitNotifier extends AsyncNotifier<void> {
     final repo = await ref.read(profileRepositoryProvider.future);
     final dataSource = ref.read(profileDataSourceProvider);
 
-    final existing = await dataSource.getByName('DevOmnix VPN');
+    final existing = await dataSource.getByName(kAutoProfileName);
     final String profileId;
     if (existing != null) {
       final entity = existing.toEntity();
@@ -61,10 +61,10 @@ class VpnAutoInitNotifier extends AsyncNotifier<void> {
     } else {
       final result = await repo.addLocal(
         vlessUrl,
-        userOverride: const UserOverride(name: 'DevOmnix VPN'),
+        userOverride: const UserOverride(name: kAutoProfileName),
       ).run();
       if (result.isLeft()) return false;
-      final added = await dataSource.getByName('DevOmnix VPN');
+      final added = await dataSource.getByName(kAutoProfileName);
       if (added == null) return false;
       profileId = added.toEntity().id;
     }
@@ -85,7 +85,7 @@ class VpnAutoInitNotifier extends AsyncNotifier<void> {
       final repo = await ref.read(profileRepositoryProvider.future);
       final dataSource = ref.read(profileDataSourceProvider);
 
-      final existing = await dataSource.getByName('DevOmnix VPN');
+      final existing = await dataSource.getByName(kAutoProfileName);
       if (existing != null) {
         final entity = existing.toEntity();
         await repo.offlineUpdate(entity, vlessUrl).run();
@@ -109,7 +109,7 @@ class VpnAutoInitNotifier extends AsyncNotifier<void> {
       final repo = await ref.read(profileRepositoryProvider.future);
       final dataSource = ref.read(profileDataSourceProvider);
 
-      final existing = await dataSource.getByName('DevOmnix VPN');
+      final existing = await dataSource.getByName(kAutoProfileName);
       final String profileId;
       if (existing != null) {
         final entity = existing.toEntity();
@@ -118,9 +118,9 @@ class VpnAutoInitNotifier extends AsyncNotifier<void> {
       } else {
         await repo.addLocal(
           vlessUrl,
-          userOverride: const UserOverride(name: 'DevOmnix VPN'),
+          userOverride: const UserOverride(name: kAutoProfileName),
         ).run();
-        final added = await dataSource.getByName('DevOmnix VPN');
+        final added = await dataSource.getByName(kAutoProfileName);
         if (added == null) return;
         profileId = added.toEntity().id;
       }
@@ -134,6 +134,42 @@ class VpnAutoInitNotifier extends AsyncNotifier<void> {
   Future<void> refresh() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _addProfileFromBackend());
+  }
+
+  /// Пересоздаёт конфиг на бэкенде (POST /vpn/reset) и заменяет ТОЛЬКО
+  /// авто-профиль (по [kAutoProfileName]), не трогая ручные серверы.
+  /// Возвращает новый vless_url. Переподключается сам, если VPN активен.
+  Future<String> resetAndReconnect() async {
+    final vlessUrl = await ref.read(backendServiceProvider).resetVlessConfig();
+    final repo = await ref.read(profileRepositoryProvider.future);
+    final dataSource = ref.read(profileDataSourceProvider);
+
+    final existing = await dataSource.getByName(kAutoProfileName);
+    final ProfileEntity profile;
+    if (existing != null) {
+      // Обновляем содержимое существующего авто-профиля (id не меняется).
+      final entity = existing.toEntity();
+      await repo.offlineUpdate(entity, vlessUrl).run();
+      profile = entity;
+    } else {
+      // Авто-профиля ещё нет — создаём с тем же стабильным именем.
+      await repo.addLocal(
+        vlessUrl,
+        userOverride: const UserOverride(name: kAutoProfileName),
+      ).run();
+      final added = await dataSource.getByName(kAutoProfileName);
+      if (added == null) throw Exception('Не удалось создать авто-профиль после reset');
+      profile = added.toEntity();
+    }
+
+    // Принудительно делаем авто-профиль активным (не зависим от _initIfNeeded).
+    await repo.setAsActive(profile.id).run();
+
+    // Слушатель activeProfileProvider переподключает только при СМЕНЕ id.
+    // При offlineUpdate id тот же → reconnect делаем явно. Внутри reconnect
+    // есть guard: срабатывает только если VPN сейчас Connected.
+    await ref.read(connectionNotifierProvider.notifier).reconnect(profile);
+    return vlessUrl;
   }
 }
 
