@@ -12,7 +12,6 @@ import 'package:devomnix/features/home/notifier/installed_apps_provider.dart';
 import 'package:devomnix/features/home/notifier/vpn_auto_init_notifier.dart';
 import 'package:devomnix/features/home/widget/app_picker_sheet.dart';
 import 'package:devomnix/features/home/widget/connection_button.dart';
-import 'package:devomnix/features/home/widget/promo_banner.dart';
 import 'package:devomnix/features/home/widget/speed_indicator.dart';
 import 'package:devomnix/features/per_app_proxy/data/app_proxy_data_source.dart';
 import 'package:devomnix/features/per_app_proxy/data/selected_data_provider.dart';
@@ -63,9 +62,6 @@ class HomePage extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── 1. Promo banner (phone not confirmed) ──────────────────
-              const PromoBanner(),
-
               // ── 2. VPN / Proxy toggle ──────────────────────────────────
               if (PlatformUtils.isAndroid)
                 Padding(
