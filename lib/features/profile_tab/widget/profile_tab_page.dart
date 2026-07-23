@@ -110,7 +110,6 @@ class _PromoDialogState extends ConsumerState<_PromoDialog> {
           TextField(
             controller: widget.controller,
             autofocus: true,
-            textCapitalization: TextCapitalization.characters,
             decoration: InputDecoration(
               hintText: 'НАПРИМЕР: PROMO2024',
               border: const OutlineInputBorder(),
@@ -143,7 +142,7 @@ class _PromoDialogState extends ConsumerState<_PromoDialog> {
   }
 
   Future<void> _activate(BuildContext context) async {
-    final code = widget.controller.text.trim().toUpperCase();
+    final code = widget.controller.text.trim();
     if (code.isEmpty) {
       setState(() => _error = 'Введите промокод');
       return;

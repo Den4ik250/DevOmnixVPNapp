@@ -35,7 +35,8 @@
       "PowerShell(pip install *)",
       "PowerShell(python -c \"import cairosvg; print\\('cairosvg OK'\\)\" 2>&1)",
       "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" install -r \"C:\\\\Users\\\\user\\\\StudioProjects\\\\DevOmnixVPNapp\\\\build\\\\app\\\\outputs\\\\flutter-apk\\\\app-release.apk\" 2>&1)",
-      "PowerShell(python \"C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\Temp\\\\deploy_auth.py\")"
+      "PowerShell(python \"C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\Temp\\\\deploy_auth.py\")",
+      "Bash(flutter analyze *)"
     ]
   }
 }
