@@ -58,13 +58,25 @@ class ConnectionButton extends HookConsumerWidget {
             // Профиля нет локально — проверяем бэкенд
             final hasSub = await ref.read(subscriptionStatusProvider.future);
             if (!hasSub) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Нет активной подписки. Перейдите в раздел Тарифы.')),
-              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Нет активной подписки. Перейдите в раздел Тарифы.')),
+                );
+              }
               return;
             }
-            // Подписка есть — скачиваем конфиг и активируем
+            // Подписка есть — скачиваем конфиг и активируем.
+            // activateAndConnect ловит ошибку в AsyncValue.guard, поэтому её надо
+            // явно достать из состояния — иначе сбой получения конфига выглядит
+            // как «кнопка не работает».
             await ref.read(vpnAutoInitProvider.notifier).activateAndConnect();
+            if (context.mounted && ref.read(vpnAutoInitProvider) is AsyncError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Не удалось получить конфигурацию VPN. Попробуйте ещё раз.'),
+                ),
+              );
+            }
             return;
           }
           if (await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
