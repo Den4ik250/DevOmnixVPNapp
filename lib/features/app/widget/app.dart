@@ -16,6 +16,7 @@ import 'package:devomnix/core/router/go_router/helper/active_breakpoint_notifier
 import 'package:devomnix/core/theme/app_theme.dart';
 import 'package:devomnix/core/theme/theme_preferences.dart';
 import 'package:devomnix/features/app_update/notifier/app_update_notifier.dart';
+import 'package:devomnix/features/auth/widget/telegram_link_wrapper.dart';
 import 'package:devomnix/features/backend_update/widget/backend_update_wrapper.dart';
 import 'package:devomnix/features/connection/widget/connection_wrapper.dart';
 import 'package:devomnix/features/per_app_proxy/overview/per_app_proxy_service_notifier.dart';
@@ -100,6 +101,10 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                       child: child ?? const SizedBox(),
                     );
                     child = BackendUpdateWrapper(
+                      navigatorKey: router.routerDelegate.navigatorKey,
+                      child: child,
+                    );
+                    child = TelegramLinkWrapper(
                       navigatorKey: router.routerDelegate.navigatorKey,
                       child: child,
                     );

@@ -1,27 +1,50 @@
 import 'package:dio/dio.dart';
 import 'package:devomnix/core/model/constants.dart';
+import 'package:devomnix/features/auth/data/telegram_link_payload.dart';
 
 class AuthResult {
   const AuthResult({
     required this.jwt,
     required this.userId,
-    required this.freeDayUsed,
-    required this.promoUsed,
     required this.hasActiveSub,
+    this.publicId,
+    this.freeDayUsed = false,
+    this.promoUsed = false,
+    this.merged = false,
+    this.deviceSwitched = false,
+    this.phoneConflict,
   });
 
   final String jwt;
   final int userId;
+
+  /// 10-значный ID, который пользователь видит в Профиле и называет в поддержке.
+  final int? publicId;
   final bool freeDayUsed;
   final bool promoUsed;
   final bool hasActiveSub;
 
+  /// Аккаунты приложения и Telegram были объединены (кейсы T2/T6).
+  final bool merged;
+
+  /// Подписка переехала на это устройство, старое разлогинено (кейс T4).
+  final bool deviceSwitched;
+
+  /// Расхождение номера — кейс T5.
+  final PhoneConflict? phoneConflict;
+
+  /// `/auth/link` не возвращает free_day_used и promo_used, поэтому оба поля
+  /// читаются мягко — иначе привязка падала бы на разборе ответа.
   factory AuthResult.fromJson(Map<String, dynamic> json) => AuthResult(
         jwt: json['jwt'] as String,
         userId: json['user_id'] as int,
-        freeDayUsed: json['free_day_used'] as bool,
-        promoUsed: json['promo_used'] as bool,
-        hasActiveSub: json['has_active_sub'] as bool,
+        publicId: json['public_id'] as int?,
+        freeDayUsed: json['free_day_used'] as bool? ?? false,
+        promoUsed: json['promo_used'] as bool? ?? false,
+        hasActiveSub: json['has_active_sub'] as bool? ?? false,
+        merged: json['merged'] as bool? ?? false,
+        deviceSwitched: json['device_switched'] as bool? ?? false,
+        phoneConflict: PhoneConflict.fromJson(json['phone_conflict']),
       );
 }
 
@@ -40,6 +63,42 @@ class AuthRepository {
       ),
     );
     return AuthResult.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Привязка Telegram из deeplink'а. Бэкенд сам разбирает кейсы T1–T6.
+  Future<AuthResult> linkTelegram({
+    required TelegramLinkPayload payload,
+    required String deviceId,
+    bool force = false,
+    bool confirmPhone = false,
+  }) async {
+    final response = await _dio.post(
+      '${Constants.backendBaseUrl}/auth/link',
+      data: {
+        ...payload.toRequestJson(),
+        'device_id': deviceId,
+        'force': force,
+        'confirm_phone': confirmPhone,
+      },
+      options: Options(
+        sendTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ),
+    );
+    return AuthResult.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Одноразовый токен для перехода в бота: `t.me/DevOmnixVPNBot?start=link_{token}`.
+  Future<String> createLinkToken(String jwt) async {
+    final response = await _dio.post(
+      '${Constants.backendBaseUrl}/auth/link-token',
+      options: Options(
+        headers: {'Authorization': 'Bearer $jwt'},
+        sendTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ),
+    );
+    return (response.data as Map<String, dynamic>)['token'] as String;
   }
 
   Future<void> sendSmsCode(String phone, String jwt) async {

@@ -51,6 +51,10 @@ final loadingConfig = RoutingConfig(
   routes: <RouteBase>[GoRoute(path: '/home', builder: (context, state) => const Material())],
 );
 
+// ⚠️ Это индексы ВЕТОК роутера, а не кнопок нижней панели. Ветка 'settings'
+// на мобильном остаётся: на неё уводит experimental_feature_notice.dart, и
+// выбросить её отсюда значило бы получить RangeError при currentIndex == 2.
+// Из нижней панели кнопка убрана отдельно — в my_adaptive_layout.dart.
 String getNameOfBranch(bool isMobileBreakpoint, bool showProfilesAction, int index) => isMobileBreakpoint
     ? ['home', 'profile', 'settings'][index]
     : ['home', if (showProfilesAction) 'profiles', 'settings', 'logs', 'about'][index];

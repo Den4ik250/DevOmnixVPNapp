@@ -48,6 +48,10 @@ dependencies:
   screen_retriever: ^0.2.0
 
   package_info_plus: ^8.1.0
+  # device_id по спеке Авторизация.md: SHA-256(ANDROID_ID + модель).
+  # Переживает переустановку приложения — в отличие от UUID в настройках.
+  device_info_plus: ^11.2.0
+  crypto: ^3.0.6
 
   url_launcher: ^6.2.5
   vclibs: ^0.1.2

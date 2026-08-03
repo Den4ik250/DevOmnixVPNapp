@@ -82,10 +82,22 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         bottomNavigationBar: isMobileBreakpoint
             ? FocusScope(
                 node: navScopeNode,
-                child: NavigationBar(
-                  selectedIndex: navigationShell.currentIndex,
-                  destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
-                  onDestinationSelected: (index) => _onTap(context, index),
+                child: Builder(
+                  builder: (context) {
+                    final dests = _navDests(_actions(t, showProfilesAction, isMobileBreakpoint));
+                    // Веток в роутере больше, чем кнопок: «Настройки» с панели
+                    // убраны, но ветка жива (на неё уводит диалог экспери-
+                    // ментальных функций). Без ограничения NavigationBar
+                    // упал бы на selectedIndex вне диапазона destinations.
+                    final selected = navigationShell.currentIndex < dests.length
+                        ? navigationShell.currentIndex
+                        : 0;
+                    return NavigationBar(
+                      selectedIndex: selected,
+                      destinations: dests,
+                      onDestinationSelected: (index) => _onTap(context, index),
+                    );
+                  },
                 ),
               )
             : null,
@@ -102,7 +114,11 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title),
     if (isMobileBreakpoint) ShellRouteAction(Icons.person_rounded, 'Профиль'),
     if (showProfilesAction && !isMobileBreakpoint) ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title),
-    ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
+    // На телефоне вкладки «Настройки» нет: Главная + Профиль.
+    // Всё, что нужно обычному пользователю, уже собрано в Профиле, а
+    // технические настройки Hiddify ему только мешают. На десктопе вкладка
+    // остаётся — там аудитория другая.
+    if (!isMobileBreakpoint) ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
     if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title),
     if (!isMobileBreakpoint) ShellRouteAction(Icons.info_rounded, t.pages.about.title),
   ];

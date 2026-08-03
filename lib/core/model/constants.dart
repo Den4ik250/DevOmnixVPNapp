@@ -9,8 +9,15 @@ abstract class Constants {
   static const githubLatestReleaseUrl = "https://github.com/Den4ik250/DevOmnixVPNapp/releases/latest";
   static const appCastUrl = "https://raw.githubusercontent.com/Den4ik250/DevOmnixVPNapp/main/appcast.xml";
   static const telegramChannelUrl = "https://t.me/devomnix";
-  static const privacyPolicyUrl = "https://devomnix.com/privacy-policy/";
-  static const termsAndConditionsUrl = "https://devomnix.com/terms/";
+  /// Бот поддержки. Отдельный от канала компании и от VPN-бота — не путать.
+  static const supportBotUrl = "https://t.me/DevOmnixSupportBot";
+  /// VPN-бот. ⚠️ Ссылка зафиксирована при согласовании в Platega —
+  /// менять нельзя, иначе пересогласование проекта в банке.
+  static const vpnBotUrl = "https://t.me/DevOmnixVPNBot";
+  // Документы живут на telegra.ph — их же адреса заявлены в BotFather и в Platega.
+  // Менять только вместе с ботом и менеджером кассы: смена ссылок = пересогласование.
+  static const privacyPolicyUrl = "https://telegra.ph/Politika-konfidencialnosti-08-01-68";
+  static const termsAndConditionsUrl = "https://telegra.ph/Polzovatelskoe-soglashenie-08-01-30";
   static const cfWarpPrivacyPolicy = "https://www.cloudflare.com/application/privacypolicy/";
   static const cfWarpTermsOfService = "https://www.cloudflare.com/application/terms/";
 

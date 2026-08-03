@@ -1,3 +1,4 @@
+import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend/backend_service.dart';
 import 'package:devomnix/features/connection/notifier/connection_notifier.dart';
@@ -36,8 +37,11 @@ class VpnAutoInitNotifier extends AsyncNotifier<void> {
       final activeProfile = await ref.read(activeProfileProvider.future);
       if (activeProfile != null) return; // уже есть активный профиль
 
-      // Проверяем бэкенд — есть ли активная подписка
-      final hasActiveSub = await ref.read(subscriptionStatusProvider.future);
+      // Точка 1 из трёх: проверка подписки при запуске приложения.
+      // Идёт через guard, а не через subscriptionStatusProvider — заодно
+      // поднимает часовой опрос и общий кеш на все точки проверки.
+      final hasActiveSub =
+          await ref.read(subscriptionGuardProvider.notifier).checkOnStartup();
       if (!hasActiveSub) return; // нет подписки — молча выходим
 
       await _addAndActivateProfileFromBackend();

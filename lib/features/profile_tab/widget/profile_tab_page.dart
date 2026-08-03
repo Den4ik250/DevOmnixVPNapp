@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:devomnix/core/app_info/app_info_provider.dart';
+import 'package:devomnix/core/model/constants.dart';
+import 'package:devomnix/core/preferences/general_preferences.dart';
+import 'package:devomnix/features/auth/notifier/auth_notifier.dart';
 import 'package:devomnix/core/router/go_router/go_router_notifier.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend_update/model/backend_update_state.dart';
@@ -65,10 +69,41 @@ class ProfileTabPage extends ConsumerWidget {
             subtitle: 'Пинг сервера и пересоздание конфига',
             onTap: () => context.goNamed('diagnostics'),
           ),
+          // Между «Диагностикой» и «Версией приложения» — по Задачам VPN-Сервиса
+          _ProfileSection(
+            icon: Icons.telegram,
+            title: 'Перейти в ТГ-бот',
+            subtitle: 'Привязать аккаунт, оплата и поддержка',
+            onTap: () => _openBotWithLink(context, ref),
+          ),
           const _AppVersionTile(),
         ],
       ),
     );
+  }
+}
+
+/// Открывает бота с одноразовым токеном привязки (кейс A1).
+///
+/// Без токена бот не поймёт, к какому аккаунту приложения цеплять Telegram, —
+/// у него есть только tg_id. Токен живёт 5 минут и гасится при первом
+/// предъявлении, поэтому берём его непосредственно перед переходом.
+Future<void> _openBotWithLink(BuildContext context, WidgetRef ref) async {
+  const botUrl = Constants.vpnBotUrl;
+  try {
+    final jwt = ref.read(Preferences.jwtToken);
+    final token = await ref.read(authRepositoryProvider).createLinkToken(jwt);
+    final uri = Uri.parse('$botUrl?start=link_$token');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  } catch (_) {
+    // Токен не выдался (нет сети, не авторизованы) — бот всё равно полезен:
+    // там оплата и поддержка. Открываем без привязки, а не показываем ошибку.
+    final uri = Uri.parse(botUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 }
 
@@ -204,6 +239,38 @@ class _AccountHeader extends ConsumerWidget {
                     me['phone'] != null ? (me['phone'] as String) : 'DevOmnix VPN',
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
+                  // Публичный ID — его человек называет в поддержке, по нему
+                  // же оператор находит клиента в 3X-UI. Копируется тапом,
+                  // чтобы не переписывать десять цифр вручную.
+                  if (me['public_id'] != null) ...[
+                    const Gap(2),
+                    InkWell(
+                      onTap: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: '${me['public_id']}'),
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('ID скопирован')),
+                          );
+                        }
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'ID: ${me['public_id']}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const Gap(4),
+                          Icon(Icons.copy_rounded,
+                              size: 12, color: theme.colorScheme.onSurfaceVariant),
+                        ],
+                      ),
+                    ),
+                  ],
                   const Gap(2),
                   // Статус берём из единого provider
                   subStatus.when(

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
+import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
+import 'package:devomnix/features/plans/widget/payment_method_sheet.dart';
+import 'package:devomnix/features/plans/widget/payment_waiting_dialog.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -152,32 +155,62 @@ class _PlansPageState extends ConsumerState<PlansPage> {
 
   Future<void> _handleBuy(_Plan plan, int months) async {
     if (_paying) return;
+
+    // Способ оплаты выбирает пользователь. Раньше здесь был захардкожен
+    // 'lava' — касса, от которой отказались 31.07.2026.
+    final method = await showModalBottomSheet<PaymentMethod>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => PaymentMethodSheet(planName: plan.name, months: months),
+    );
+    if (method == null || !mounted) return;
+
     setState(() => _paying = true);
     try {
       final dio = ref.read(backendDioProvider);
       final resp = await dio.post('/payments/create', data: {
         'plan': plan.key,
         'months': months,
-        'provider': 'lava',
+        'provider': method.apiValue,
       });
       final data = resp.data as Map<String, dynamic>;
-
       if (!mounted) return;
+
+      // Кошелёк покрыл всю сумму — подписка уже активна
       if (data['status'] == 'activated') {
-        // Wallet covered full price — subscription is active now
+        ref.read(subscriptionGuardProvider.notifier).invalidateCache();
         await showDialog<void>(
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('Подписка активирована'),
-            content: Text('Тариф «${plan.name}» активен. Подключитесь через вкладку «Профили».'),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отлично'))],
+            content: Text('Тариф «${plan.name}» активен. Можно подключаться.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отлично')),
+            ],
           ),
         );
-      } else if (data['pay_url'] != null) {
+        return;
+      }
+
+      // Звёзды: счёт выставляет бот, приложение только открывает диалог
+      if (data['status'] == 'redirect_to_bot' && data['bot_url'] != null) {
+        final uri = Uri.parse(data['bot_url'] as String);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+        if (!mounted) return;
+        await _awaitPayment(data['payment_id'] as int, plan);
+        return;
+      }
+
+      // Platega: оплата в браузере, дальше ждём подтверждения
+      if (data['pay_url'] != null) {
         final uri = Uri.parse(data['pay_url'] as String);
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         }
+        if (!mounted) return;
+        await _awaitPayment(data['payment_id'] as int, plan);
       }
     } catch (e) {
       if (!mounted) return;
@@ -188,6 +221,33 @@ class _PlansPageState extends ConsumerState<PlansPage> {
     } finally {
       if (mounted) setState(() => _paying = false);
     }
+  }
+
+  /// Экран ожидания оплаты.
+  ///
+  /// Пока у бэкенда нет домена с TLS, касса не может позвать его вебхуком —
+  /// поэтому статус опрашиваем сами. `GET /payments/{id}/status` заодно
+  /// дёргает кассу на стороне сервера, так что поллинг здесь и есть механизм
+  /// зачисления, а не просто индикатор.
+  Future<void> _awaitPayment(int paymentId, _Plan plan) async {
+    final paid = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PaymentWaitingDialog(paymentId: paymentId),
+    );
+    if (paid != true || !mounted) return;
+
+    ref.read(subscriptionGuardProvider.notifier).invalidateCache();
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Оплата принята'),
+        content: Text('Тариф «${plan.name}» активен. Можно подключаться.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отлично')),
+        ],
+      ),
+    );
   }
 
   String _extractError(Object e) {

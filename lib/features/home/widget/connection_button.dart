@@ -7,6 +7,7 @@ import 'package:gap/gap.dart';
 import 'package:devomnix/core/localization/translations.dart';
 import 'package:devomnix/core/router/dialog/dialog_notifier.dart';
 import 'package:devomnix/core/widget/animated_text.dart';
+import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
 import 'package:devomnix/features/connection/model/connection_status.dart';
 import 'package:devomnix/features/connection/model/extended_connection_status.dart';
 import 'package:devomnix/features/connection/notifier/connection_notifier.dart';
@@ -75,6 +76,17 @@ class ConnectionButton extends HookConsumerWidget {
                 const SnackBar(
                   content: Text('Не удалось получить конфигурацию VPN. Попробуйте ещё раз.'),
                 ),
+              );
+            }
+            return;
+          }
+          // Профиль есть локально — но это ещё не значит, что подписка жива.
+          // Без этой проверки истёкшая подписка, возврат звёзд и отключение
+          // админом продолжали бы подключаться со старого конфига.
+          if (!await ref.read(subscriptionGuardProvider.notifier).ensureActiveBeforeConnect()) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Подписка неактивна. Перейдите в раздел Тарифы.')),
               );
             }
             return;

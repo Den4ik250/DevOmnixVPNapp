@@ -179,7 +179,8 @@ class _SupportCard extends StatelessWidget {
             const Gap(16),
             OutlinedButton.icon(
               onPressed: () => launchUrl(
-                Uri.parse(Constants.telegramChannelUrl),
+                // Раньше вела на канал компании — там на вопросы не отвечают.
+                Uri.parse(Constants.supportBotUrl),
                 mode: LaunchMode.externalApplication,
               ),
               icon: const Icon(Icons.telegram, size: 18),

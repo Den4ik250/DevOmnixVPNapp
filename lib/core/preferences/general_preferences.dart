@@ -112,6 +112,10 @@ abstract class Preferences {
 
   static final deviceId = PreferencesNotifier.create<String, String>("device_id", "");
 
+  /// Публичный 10-значный ID — его пользователь видит в Профиле и называет
+  /// в поддержке. Приходит с бэкенда, здесь только кэшируется.
+  static final publicId = PreferencesNotifier.create<String, String>("public_id", "");
+
   static final promoUsed = PreferencesNotifier.create<bool, bool>("promo_used", false);
 
   static final hasActiveSub = PreferencesNotifier.create<bool, bool>("has_active_sub", false);
