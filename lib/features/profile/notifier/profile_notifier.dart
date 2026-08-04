@@ -76,7 +76,12 @@ class AddProfileNotifier extends _$AddProfileNotifier with AppLogger {
         );
       } else {
         loggy.debug("adding profile, content");
-        task = _profilesRepo.addLocal(safeDecodeBase64(rawInput));
+        // `vless://` и прочие конфиги сюда и попадают: LinkParser знает только
+        // http(s)/ftp и схемы вида devomnix://. Исходную строку сохраняем в
+        // userOverride — в файл профиля ложится сконвертированный JSON, и без
+        // этого показать ссылку в «Редактировать» было бы нечем.
+        final content = safeDecodeBase64(rawInput);
+        task = _profilesRepo.addLocal(content, userOverride: UserOverride(sourceLink: content));
       }
       return await task
           .match(

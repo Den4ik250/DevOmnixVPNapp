@@ -525,8 +525,7 @@ class _ServersSection extends ConsumerWidget {
             onSelect: () => _select(ref, p),
             onDelete: () => _confirmDelete(context, ref, p),
             onRename: () => _rename(context, ref, p),
-            // Ссылка есть только у remote-профилей; локальные править нечем.
-            onEditUrl: p is RemoteProfileEntity ? () => _editUrl(context, ref, p) : null,
+            onEditUrl: () => _editUrl(context, ref, p),
           ),
         ),
 
@@ -566,24 +565,50 @@ class _ServersSection extends ConsumerWidget {
         .edit(profile.id, ProfileEntriesCompanion(name: Value(trimmed)));
   }
 
-  /// Правка VLESS-ссылки. Поле открывается с текущей ссылкой, а не пустым:
+  /// Правка ссылки сервера. Поле открывается с текущей ссылкой, а не пустым:
   /// ошибка обычно в одном символе, и вслепую её не найти.
-  Future<void> _editUrl(BuildContext context, WidgetRef ref, RemoteProfileEntity profile) async {
-    final url = await _promptText(
+  ///
+  /// Профили бывают двух видов, и правятся по-разному. `vless://` не проходит
+  /// `LinkParser` (тот знает только http(s)/ftp и схемы вида `devomnix://`),
+  /// поэтому свои серверы почти всегда **local**: ссылка лежит в
+  /// `userOverride.sourceLink`, а в файле — сконвертированный sing-box JSON.
+  Future<void> _editUrl(BuildContext context, WidgetRef ref, ProfileEntity profile) async {
+    final current = switch (profile) {
+      RemoteProfileEntity(:final url) => url,
+      LocalProfileEntity() => profile.userOverride?.sourceLink,
+    };
+
+    final input = await _promptText(
       context,
       title: 'Редактировать сервер',
-      label: 'Ссылка VLESS',
-      initial: profile.url,
+      label: 'Ссылка сервера',
+      initial: current ?? '',
       maxLines: 6,
+      // У профилей, заведённых до появления sourceLink, показывать нечего.
+      helperText: current == null ? 'Прежняя ссылка не сохранена — вставьте новую целиком' : null,
     );
-    final trimmed = url?.trim();
-    if (trimmed == null || trimmed.isEmpty || trimmed == profile.url) return;
+    final trimmed = input?.trim();
+    if (trimmed == null || trimmed.isEmpty || trimmed == current) return;
 
     final repo = await ref.read(profileRepositoryProvider.future);
 
-    // `upsertRemote` ищет профиль по URL, а URL изменился — значит будет
-    // создан новый, а не обновлён старый. Поэтому сначала добавляем: если
-    // ссылка битая и не прошла разбор, старый сервер остаётся нетронутым.
+    if (profile is! RemoteProfileEntity) {
+      // Local: содержимое переразбирается на месте, id сохраняется. Запись в БД
+      // происходит только после успешной валидации, поэтому битая ссылка
+      // оставит сервер нетронутым.
+      final override = (profile.userOverride ?? const UserOverride()).copyWith(sourceLink: trimmed);
+      final result = await repo.offlineUpdate(profile.copyWith(userOverride: override), trimmed).run();
+      if (result.isLeft() && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ссылка не подошла — сервер не изменён')),
+        );
+      }
+      return;
+    }
+
+    // Remote: `upsertRemote` ищет профиль по URL, а URL изменился — значит
+    // будет создан новый, а не обновлён старый. Поэтому сначала добавляем:
+    // если ссылка не прошла разбор, старый сервер остаётся на месте.
     final result = await repo.upsertRemote(trimmed).run();
     if (result.isLeft()) {
       if (context.mounted) {
@@ -652,6 +677,7 @@ Future<String?> _promptText(
   required String label,
   required String initial,
   int maxLines = 1,
+  String? helperText,
 }) async {
   final controller = TextEditingController(text: initial);
   final result = await showDialog<String>(
@@ -663,7 +689,7 @@ Future<String?> _promptText(
         autofocus: true,
         minLines: 1,
         maxLines: maxLines,
-        decoration: InputDecoration(labelText: label),
+        decoration: InputDecoration(labelText: label, helperText: helperText, helperMaxLines: 2),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),

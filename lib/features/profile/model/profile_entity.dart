@@ -80,6 +80,13 @@ abstract class UserOverride with _$UserOverride {
     int? updateInterval,
     bool? enableWarp,
     bool? enableFragment,
+    /// Исходная строка, из которой заведён local-профиль (обычно `vless://`).
+    ///
+    /// В файл профиля ложится уже сконвертированный sing-box JSON, а ссылка
+    /// теряется — и показать её в «Редактировать» неоткуда. Правка вслепую
+    /// для ссылок не работает: ошибка обычно в одном символе.
+    /// У профилей, заведённых до появления поля, здесь `null`.
+    String? sourceLink,
   }) = _UserOverride;
 
   factory UserOverride.fromJson(Map<String, Object?> json) => _$UserOverrideFromJson(json);
