@@ -56,7 +56,18 @@ class AuthState {
       );
 }
 
-final authRepositoryProvider = Provider<AuthRepository>((_) => AuthRepository(Dio()));
+/// 🔴 `connectTimeout` обязателен. Голый `Dio()` его не имеет: если TCP до
+/// бэкенда уходит в молчание (не «отказано», а чёрная дыра), `await` не
+/// вернётся и исключения не будет — `sendTimeout`/`receiveTimeout` на этой
+/// стадии ещё не работают. Экран просто зависал без ошибки.
+final authRepositoryProvider = Provider<AuthRepository>(
+  (_) => AuthRepository(
+    Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 15),
+    )),
+  ),
+);
 
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._ref) : super(const AuthState());

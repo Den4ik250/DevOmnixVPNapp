@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+// Точечные show: drift экспортирует свой Column, он конфликтует с Flutter.
+import 'package:drift/drift.dart' show Value;
+import 'package:devomnix/core/db/db.dart' show ProfileEntriesCompanion;
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:devomnix/core/app_info/app_info_provider.dart';
@@ -89,22 +92,56 @@ class ProfileTabPage extends ConsumerWidget {
 /// у него есть только tg_id. Токен живёт 5 минут и гасится при первом
 /// предъявлении, поэтому берём его непосредственно перед переходом.
 Future<void> _openBotWithLink(BuildContext context, WidgetRef ref) async {
-  const botUrl = Constants.vpnBotUrl;
+  // Токен получаем первым, но его неудача переход не отменяет: в боте есть
+  // оплата и поддержка, они полезны и без привязки.
+  String? token;
   try {
     final jwt = ref.read(Preferences.jwtToken);
-    final token = await ref.read(authRepositoryProvider).createLinkToken(jwt);
-    final uri = Uri.parse('$botUrl?start=link_$token');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    token = await ref.read(authRepositoryProvider).createLinkToken(jwt);
   } catch (_) {
-    // Токен не выдался (нет сети, не авторизованы) — бот всё равно полезен:
-    // там оплата и поддержка. Открываем без привязки, а не показываем ошибку.
-    final uri = Uri.parse(botUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    token = null;
+  }
+
+  final opened = await _launchBot(token);
+  if (!opened && context.mounted) {
+    // Раньше оба провала `canLaunchUrl` проглатывались молча, и кнопка
+    // выглядела сломанной. Пусть лучше скажет, что не смогла.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Не удалось открыть Telegram')),
+    );
+  }
+}
+
+/// Пробует открыть бота: сначала приложением Telegram, потом ссылкой.
+///
+/// 🔴 Порядок важен. `https://t.me/...` на Android уходит тому, кто заявлен
+/// обработчиком ссылки, и если у Telegram не подтверждены App Links, человек
+/// попадает на веб-страницу t.me вместо бота — выглядит как «кнопка ведёт
+/// в никуда». `tg://resolve` открывает клиент напрямую.
+///
+/// https остаётся запасным путём (Telegram не установлен) и менять его нельзя:
+/// именно эта ссылка зафиксирована при согласовании в Platega.
+Future<bool> _launchBot(String? token) async {
+  const botUrl = Constants.vpnBotUrl;
+  final botName = Uri.parse(botUrl).pathSegments.last;
+  final start = token == null ? null : 'link_$token';
+
+  final candidates = <Uri>[
+    Uri.parse('tg://resolve?domain=$botName'
+        '${start == null ? '' : '&start=$start'}'),
+    Uri.parse('$botUrl${start == null ? '' : '?start=$start'}'),
+  ];
+
+  for (final uri in candidates) {
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        return true;
+      }
+    } catch (_) {
+      // ActivityNotFoundException при отсутствии Telegram — пробуем следующий
     }
   }
+  return false;
 }
 
 Future<void> _showPromoDialog(BuildContext context, WidgetRef ref) async {
@@ -487,6 +524,9 @@ class _ServersSection extends ConsumerWidget {
             isAuto: false,
             onSelect: () => _select(ref, p),
             onDelete: () => _confirmDelete(context, ref, p),
+            onRename: () => _rename(context, ref, p),
+            // Ссылка есть только у remote-профилей; локальные править нечем.
+            onEditUrl: p is RemoteProfileEntity ? () => _editUrl(context, ref, p) : null,
           ),
         ),
 
@@ -510,6 +550,63 @@ class _ServersSection extends ConsumerWidget {
     await repo.setAsActive(profile.id).run();
     // Переподключение при активном VPN делает ConnectionNotifier
     // (слушатель activeProfileProvider → reconnect), вручную не нужно.
+  }
+
+  Future<void> _rename(BuildContext context, WidgetRef ref, ProfileEntity profile) async {
+    final name = await _promptText(
+      context,
+      title: 'Переименовать сервер',
+      label: 'Название',
+      initial: profile.name,
+    );
+    final trimmed = name?.trim();
+    if (trimmed == null || trimmed.isEmpty || trimmed == profile.name) return;
+    await ref
+        .read(profileDataSourceProvider)
+        .edit(profile.id, ProfileEntriesCompanion(name: Value(trimmed)));
+  }
+
+  /// Правка VLESS-ссылки. Поле открывается с текущей ссылкой, а не пустым:
+  /// ошибка обычно в одном символе, и вслепую её не найти.
+  Future<void> _editUrl(BuildContext context, WidgetRef ref, RemoteProfileEntity profile) async {
+    final url = await _promptText(
+      context,
+      title: 'Редактировать сервер',
+      label: 'Ссылка VLESS',
+      initial: profile.url,
+      maxLines: 6,
+    );
+    final trimmed = url?.trim();
+    if (trimmed == null || trimmed.isEmpty || trimmed == profile.url) return;
+
+    final repo = await ref.read(profileRepositoryProvider.future);
+
+    // `upsertRemote` ищет профиль по URL, а URL изменился — значит будет
+    // создан новый, а не обновлён старый. Поэтому сначала добавляем: если
+    // ссылка битая и не прошла разбор, старый сервер остаётся нетронутым.
+    final result = await repo.upsertRemote(trimmed).run();
+    if (result.isLeft()) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ссылка не подошла — сервер не изменён')),
+        );
+      }
+      return;
+    }
+
+    final ds = ref.read(profileDataSourceProvider);
+    final added = await ds.getByUrl(trimmed);
+    if (added == null) return;
+
+    // Имя, которое человек задал сам, важнее remark'а из новой ссылки.
+    await ds.edit(added.id, ProfileEntriesCompanion(name: Value(profile.name)));
+
+    if (profile.active) {
+      await repo.setAsActive(added.id).run();
+    }
+    // Активность уже переехала на новый профиль, поэтому isActive: false —
+    // иначе DAO активировал бы произвольный профиль из списка.
+    await repo.deleteById(profile.id, false).run();
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref, ProfileEntity profile) async {
@@ -547,6 +644,61 @@ class _ServersSection extends ConsumerWidget {
   }
 }
 
+/// Диалог с одним текстовым полем. Поле всегда открывается заполненным —
+/// правка вслепую (пустое поле вместо текущего значения) для ссылок неприменима.
+Future<String?> _promptText(
+  BuildContext context, {
+  required String title,
+  required String label,
+  required String initial,
+  int maxLines = 1,
+}) async {
+  final controller = TextEditingController(text: initial);
+  final result = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        minLines: 1,
+        maxLines: maxLines,
+        decoration: InputDecoration(labelText: label),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, controller.text),
+          child: const Text('Сохранить'),
+        ),
+      ],
+    ),
+  );
+  controller.dispose();
+  return result;
+}
+
+enum _ServerAction { rename, edit, delete }
+
+class _MenuRow extends StatelessWidget {
+  const _MenuRow({required this.icon, required this.label, this.color});
+
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: color),
+        const Gap(12),
+        Text(label, style: color == null ? null : TextStyle(color: color)),
+      ],
+    );
+  }
+}
+
 class _ServerTile extends StatelessWidget {
   const _ServerTile({
     required this.title,
@@ -555,6 +707,8 @@ class _ServerTile extends StatelessWidget {
     required this.isAuto,
     required this.onSelect,
     this.onDelete,
+    this.onRename,
+    this.onEditUrl,
   });
 
   final String title;
@@ -563,6 +717,8 @@ class _ServerTile extends StatelessWidget {
   final bool isAuto;
   final VoidCallback onSelect;
   final VoidCallback? onDelete;
+  final VoidCallback? onRename;
+  final VoidCallback? onEditUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -611,11 +767,41 @@ class _ServerTile extends StatelessWidget {
             Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary, size: 20)
           else
             TextButton(onPressed: onSelect, child: const Text('Выбрать')),
-          if (onDelete != null)
-            IconButton(
-              icon: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error, size: 20),
-              tooltip: 'Удалить',
-              onPressed: onDelete,
+          if (onDelete != null || onRename != null || onEditUrl != null)
+            PopupMenuButton<_ServerAction>(
+              icon: const Icon(Icons.more_vert_rounded, size: 20),
+              tooltip: 'Ещё',
+              onSelected: (action) {
+                switch (action) {
+                  case _ServerAction.rename:
+                    onRename?.call();
+                  case _ServerAction.edit:
+                    onEditUrl?.call();
+                  case _ServerAction.delete:
+                    onDelete?.call();
+                }
+              },
+              itemBuilder: (_) => [
+                if (onRename != null)
+                  const PopupMenuItem(
+                    value: _ServerAction.rename,
+                    child: _MenuRow(icon: Icons.drive_file_rename_outline_rounded, label: 'Переименовать'),
+                  ),
+                if (onEditUrl != null)
+                  const PopupMenuItem(
+                    value: _ServerAction.edit,
+                    child: _MenuRow(icon: Icons.edit_outlined, label: 'Редактировать'),
+                  ),
+                if (onDelete != null)
+                  PopupMenuItem(
+                    value: _ServerAction.delete,
+                    child: _MenuRow(
+                      icon: Icons.delete_outline_rounded,
+                      label: 'Удалить',
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+              ],
             ),
         ],
       ),
