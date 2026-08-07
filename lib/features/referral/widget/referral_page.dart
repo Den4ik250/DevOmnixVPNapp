@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
+import 'package:devomnix/features/backend/backend_error.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -65,6 +66,15 @@ class ReferralPage extends ConsumerWidget {
               const Icon(Icons.error_outline, size: 48),
               const Gap(16),
               Text('Ошибка загрузки', style: theme.textTheme.titleMedium),
+              const Gap(8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: SelectableText(
+                  describeBackendError(e),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
               const Gap(8),
               FilledButton.tonal(
                 onPressed: () => ref.invalidate(_referralProvider),

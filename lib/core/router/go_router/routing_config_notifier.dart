@@ -15,6 +15,7 @@ import 'package:devomnix/features/home/widget/home_page.dart';
 import 'package:devomnix/features/plans/widget/plans_page.dart';
 import 'package:devomnix/features/profile_tab/widget/diagnostics_page.dart';
 import 'package:devomnix/features/profile_tab/widget/profile_tab_page.dart';
+import 'package:devomnix/features/account/widget/account_page.dart';
 import 'package:devomnix/features/referral/widget/referral_page.dart';
 import 'package:devomnix/features/wallet/widget/wallet_page.dart';
 import 'package:devomnix/features/intro/widget/intro_page.dart';
@@ -161,6 +162,12 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                     builder: (_, _) => FocusScope(node: branchesScope['profile'], child: const ProfileTabPage()),
                     routes: <GoRoute>[
                       GoRoute(
+                        name: 'account',
+                        path: '/account',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const AccountPage()),
+                      ),
+                      GoRoute(
                         name: 'plans',
                         path: '/plans',
                         pageBuilder: (_, state) =>
@@ -230,6 +237,12 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                   ),
                   routes: <GoRoute>[
                     if (!isMobileBreakpoint) ...[
+                      GoRoute(
+                        name: 'account',
+                        path: '/account',
+                        pageBuilder: (_, state) =>
+                            customTransition(TransitionType.slide, state.pageKey, const AccountPage()),
+                      ),
                       GoRoute(
                         name: 'plans',
                         path: '/plans',

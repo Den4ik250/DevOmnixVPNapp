@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
 import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
+import 'package:devomnix/features/backend/backend_error.dart';
 import 'package:devomnix/features/plans/widget/payment_method_sheet.dart';
 import 'package:devomnix/features/plans/widget/payment_waiting_dialog.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -121,6 +122,15 @@ class _PlansPageState extends ConsumerState<PlansPage> {
                   const Icon(Icons.error_outline, size: 48),
                   const Gap(16),
                   Text('Не удалось загрузить тарифы', style: Theme.of(context).textTheme.titleMedium),
+                  const Gap(8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: SelectableText(
+                      describeBackendError(e),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
                   const Gap(8),
                   FilledButton.tonal(
                     onPressed: () => ref.invalidate(_plansProvider),

@@ -53,10 +53,22 @@ class AuthRepository {
 
   final Dio _dio;
 
-  Future<AuthResult> deviceLogin(String deviceId) async {
+  /// [deviceName] и [platform] бэкенд кладёт в `device_sessions` — по ним
+  /// человек узнаёт свои телефоны в кабинете, а поддержка понимает, о каком
+  /// устройстве речь. Оба поля необязательны: старые версии приложения их не
+  /// шлют, и вход обязан работать без них.
+  Future<AuthResult> deviceLogin(
+    String deviceId, {
+    String? deviceName,
+    String? platform,
+  }) async {
     final response = await _dio.post(
       '${Constants.backendBaseUrl}/auth/device',
-      data: {'device_id': deviceId},
+      data: {
+        'device_id': deviceId,
+        if (deviceName != null) 'device_name': deviceName,
+        if (platform != null) 'platform': platform,
+      },
       options: Options(
         sendTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),

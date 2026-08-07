@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:devomnix/core/preferences/general_preferences.dart';
+import 'package:devomnix/features/backend/backend_error.dart';
 import 'package:devomnix/features/auth/data/auth_repository.dart';
 import 'package:devomnix/features/auth/data/device_id_service.dart';
 import 'package:devomnix/features/auth/data/telegram_link_payload.dart';
@@ -79,8 +81,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState(status: AuthStatus.loading);
     try {
       final deviceId = await _ensureDeviceId();
+      // Модель и платформу шлём при каждом входе, а не только при первом:
+      // человек меняет телефон, и запись об устройстве должна успевать.
+      final device = await const DeviceIdService().describe();
       final repo = _ref.read(authRepositoryProvider);
-      final result = await repo.deviceLogin(deviceId);
+      final result = await repo.deviceLogin(
+        deviceId,
+        deviceName: device.name,
+        platform: device.platform,
+      );
       await _applyResult(result);
       state = AuthState(
         status: AuthStatus.ready,
@@ -88,6 +97,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         hasActiveSub: result.hasActiveSub,
       );
     } catch (e) {
+      // Молчать здесь нельзя. Офлайн-режим внешне неотличим от исправной
+      // работы: JWT пустой, public_id пустой, все экраны отдают «ошибка
+      // загрузки» — и ни одной строки о причине. Именно на этом застряла
+      // диагностика «приложение не видит бэкенд».
+      debugPrint('[auth] вход по device_id не удался: ${describeBackendError(e)}');
       // Allow offline mode — treat as no active sub
       await _ref.read(Preferences.authCompleted.notifier).update(true);
       state = const AuthState(status: AuthStatus.ready, hasActiveSub: false);
