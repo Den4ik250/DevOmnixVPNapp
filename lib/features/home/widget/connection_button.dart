@@ -2,9 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
 import 'package:devomnix/core/localization/translations.dart';
+import 'package:devomnix/features/backend/backend_error.dart';
 import 'package:devomnix/core/router/dialog/dialog_notifier.dart';
 import 'package:devomnix/core/widget/animated_text.dart';
 import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
@@ -27,6 +29,11 @@ class ConnectionButton extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final connectionStatus = ref.watch(connectionNotifierProvider);
+    // 🔴 Пока идёт проверка подписки, ядро ещё в Disconnected — снаружи это
+    // выглядело как «кнопка не нажалась»: нажатие уходило в сеть, а картинка
+    // не менялась до самого коннекта. Своё состояние занятости закрывает
+    // именно этот промежуток и заодно глотает повторные тычки.
+    final busy = useState(false);
     final activeProxy = ref.watch(activeProxyNotifierProvider);
     final delay = activeProxy.valueOrNull?.urlTestDelay ?? 0;
     final requiresReconnect = ref.watch(configOptionNotifierProvider).valueOrNull;
@@ -55,44 +62,60 @@ class ConnectionButton extends HookConsumerWidget {
           return await ref.read(connectionNotifierProvider.notifier).reconnect(activeProfile);
         },
         AsyncData(value: Disconnected()) || AsyncError() => () async {
-          if (ref.read(activeProfileProvider).valueOrNull == null) {
-            // Профиля нет локально — проверяем бэкенд
-            final hasSub = await ref.read(subscriptionStatusProvider.future);
-            if (!hasSub) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Нет активной подписки. Перейдите в раздел Тарифы.')),
+          if (busy.value) return; // повторный тычок, пока идёт проверка
+          busy.value = true;
+          try {
+            final guard = ref.read(subscriptionGuardProvider.notifier);
+            final hasLocalProfile =
+                ref.read(activeProfileProvider).valueOrNull != null;
+
+            // Проверка подписки. Ограничена по времени внутри guard'а: пока
+            // есть локальный конфиг — пять секунд, дольше человек с пальцем
+            // на кнопке ждать не должен.
+            final check =
+                await guard.ensureActiveBeforeConnect(patient: !hasLocalProfile);
+
+            if (check == SubscriptionCheck.inactive) {
+              _snack(context, hasLocalProfile
+                  ? 'Подписка неактивна. Перейдите в раздел Тарифы.'
+                  : 'Нет активной подписки. Перейдите в раздел Тарифы.');
+              return;
+            }
+
+            if (check == SubscriptionCheck.unknown) {
+              // 🔴 Сервер не ответил — это не повод отбирать доступ.
+              // Локальный конфиг есть → подключаемся, как подключались до
+              // появления проверки. Отзыв подписки при следующей удачной
+              // проверке всё равно сработает.
+              if (!hasLocalProfile) {
+                _snack(
+                  context,
+                  'Сервер не отвечает, а конфигурации ещё нет. '
+                  '${describeBackendError(guard.lastError ?? 'причина неизвестна')}',
                 );
+                return;
+              }
+              _snack(context,
+                  'Сервер не отвечает — подключаюсь по сохранённой конфигурации.');
+            } else if (!hasLocalProfile) {
+              // Подписка подтверждена, но конфига локально нет — качаем.
+              // activateAndConnect ловит ошибку в AsyncValue.guard, поэтому её
+              // надо явно достать из состояния, иначе сбой получения конфига
+              // выглядит как «кнопка не работает».
+              await ref.read(vpnAutoInitProvider.notifier).activateAndConnect();
+              final state = ref.read(vpnAutoInitProvider);
+              if (state is AsyncError) {
+                _snack(context,
+                    'Не удалось получить конфигурацию VPN. ${describeBackendError(state.error)}');
               }
               return;
             }
-            // Подписка есть — скачиваем конфиг и активируем.
-            // activateAndConnect ловит ошибку в AsyncValue.guard, поэтому её надо
-            // явно достать из состояния — иначе сбой получения конфига выглядит
-            // как «кнопка не работает».
-            await ref.read(vpnAutoInitProvider.notifier).activateAndConnect();
-            if (context.mounted && ref.read(vpnAutoInitProvider) is AsyncError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Не удалось получить конфигурацию VPN. Попробуйте ещё раз.'),
-                ),
-              );
+
+            if (await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
+              await ref.read(connectionNotifierProvider.notifier).toggleConnection();
             }
-            return;
-          }
-          // Профиль есть локально — но это ещё не значит, что подписка жива.
-          // Без этой проверки истёкшая подписка, возврат звёзд и отключение
-          // админом продолжали бы подключаться со старого конфига.
-          if (!await ref.read(subscriptionGuardProvider.notifier).ensureActiveBeforeConnect()) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Подписка неактивна. Перейдите в раздел Тарифы.')),
-              );
-            }
-            return;
-          }
-          if (await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
-            return await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+          } finally {
+            busy.value = false;
           }
         },
         AsyncData(value: Connected()) => () async {
@@ -106,18 +129,28 @@ class ConnectionButton extends HookConsumerWidget {
         },
         _ => () {},
       },
-      enabled: switch (connectionStatus) {
-        AsyncData(value: Connected()) || AsyncData(value: Disconnected()) || AsyncError() => true,
-        _ => false,
-      },
-      label: requiresReconnect == true && connectionStatus.value == const Connected()
-          ? t.connection.reconnect
-          : extStatus.label,
+      enabled: !busy.value &&
+          switch (connectionStatus) {
+            AsyncData(value: Connected()) || AsyncData(value: Disconnected()) || AsyncError() => true,
+            _ => false,
+          },
+      label: busy.value
+          ? 'Проверка подписки…'
+          : requiresReconnect == true && connectionStatus.value == const Connected()
+              ? t.connection.reconnect
+              : extStatus.label,
       extStatus: extStatus,
-      animated: extStatus.isActive || extStatus.isConnected,
+      animated: busy.value || extStatus.isActive,
       secureLabel: secureLabel,
     );
   }
+}
+
+/// Показывает подсказку, если экран ещё жив. Молча пропадающее сообщение
+/// хуже отсутствующего: человек решает, что нажатие не сработало.
+void _snack(BuildContext context, String message) {
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
 
 class _ConnectionButton extends StatelessWidget {
@@ -176,7 +209,10 @@ class _ConnectionButton extends StatelessWidget {
       ),
     );
 
-    if (extStatus.isActive) {
+    // Пульсация — единственный признак «идёт работа». Раньше здесь стояло
+    // `extStatus.isActive`, а `animated` не использовался вовсе, поэтому
+    // проверка подписки перед коннектом проходила совершенно беззвучно.
+    if (animated) {
       hexButton = hexButton
           .animate(onPlay: (c) => c.repeat(reverse: true))
           .scaleXY(begin: 0.93, end: 1.0, duration: 850.ms, curve: Curves.easeInOut);

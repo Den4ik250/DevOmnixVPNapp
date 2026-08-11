@@ -6,9 +6,11 @@ import 'package:devomnix/core/db/db.dart' show ProfileEntriesCompanion;
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:devomnix/core/app_info/app_info_provider.dart';
+import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
 import 'package:devomnix/features/auth/widget/bot_link_launcher.dart';
 import 'package:devomnix/core/router/go_router/go_router_notifier.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
+import 'package:devomnix/features/backend/backend_error.dart';
 import 'package:devomnix/features/backend_update/model/backend_update_state.dart';
 import 'package:devomnix/features/backend_update/notifier/backend_update_notifier.dart';
 import 'package:devomnix/core/router/bottom_sheets/bottom_sheets_notifier.dart';
@@ -170,6 +172,11 @@ class _PromoDialogState extends ConsumerState<_PromoDialog> {
       final dio = ref.read(backendDioProvider);
       await dio.post('/promo/activate', data: {'code': code});
 
+      // 🔴 Кеш статуса живёт 5 минут. Без сброса только что активированный
+      // промокод не виден нигде: и кнопка, и Профиль ещё пять минут
+      // отвечают «нет активной подписки».
+      ref.read(subscriptionGuardProvider.notifier).invalidateCache();
+
       if (!context.mounted) return;
       Navigator.pop(context);
       // Navigate to home tab and trigger automatic VPN connection
@@ -264,15 +271,39 @@ class _AccountHeader extends ConsumerWidget {
                       ),
                     ),
                     loading: () => Text('...', style: theme.textTheme.bodySmall),
-                    error: (_, __) => Text(
-                      'Нет активной подписки',
+                    // 🔴 Отказ сети — это не «нет подписки». Пока здесь стояла
+                    // та же фраза, обрыв связи выглядел как отобранная
+                    // подписка, и человек с активным VIP видел ровно то же,
+                    // что человек без оплаты.
+                    error: (e, __) => Text(
+                      'Статус неизвестен: ${describeBackendError(e)}',
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
                     ),
                   ),
                 ],
               ),
               loading: () => const Text('Загрузка...'),
-              error: (_, __) => const Text('DevOmnix VPN'),
+              error: (e, __) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('DevOmnix VPN'),
+                  const Gap(2),
+                  Text(
+                    describeBackendError(e),
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 28),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () =>
+                        ref.read(subscriptionGuardProvider.notifier).invalidateCache(),
+                    child: const Text('Повторить'),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -281,11 +312,10 @@ class _AccountHeader extends ConsumerWidget {
   }
 }
 
-final _meProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
-  final dio = ref.watch(backendDioProvider);
-  final r = await dio.get('/auth/me');
-  return Map<String, dynamic>.from(r.data as Map);
-});
+// `/auth/me` для шапки берём из общего провайдера: раньше здесь был свой
+// запрос, и открытие Профиля отправляло два одинаковых `/auth/me` подряд —
+// этот и тот, что стоит за статусом подписки.
+final _meProvider = accountInfoProvider;
 
 class _ProfileSection extends StatelessWidget {
   const _ProfileSection({

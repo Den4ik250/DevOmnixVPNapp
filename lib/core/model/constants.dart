@@ -22,9 +22,16 @@ abstract class Constants {
   static const cfWarpTermsOfService = "https://www.cloudflare.com/application/terms/";
 
   // DevOmnix backend
-  // TODO: временно прямой IP:порт для тестов. Вернуть на https://api.devomnix.com
-  // после настройки DNS + nginx с TLS (reverse-proxy 443 → 8000).
-  static const backendBaseUrl = "http://78.17.100.87:8000";
+  //
+  // 🔴 Порт 80, а НЕ 8000. Проверено 07.08.2026: с телефона TCP до :8000 уходит
+  // в таймаут (errno 110 — пакеты дропаются молча), потому что нестандартные
+  // порты режут операторы и публичные точки доступа. На :80 стоит nginx,
+  // проксирующий тот же API — все методы, включая POST и авторизованные.
+  // Из-за :8000 приложение двое суток выглядело сломанным: браузер по другой
+  // сети открывался, а запросы из приложения не доходили.
+  //
+  // TODO: перевести на https://api.devomnix.com после настройки DNS и TLS.
+  static const backendBaseUrl = "http://78.17.100.87";
 }
 
 const kAnimationDuration = Duration(milliseconds: 250);

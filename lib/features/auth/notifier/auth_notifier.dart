@@ -1,11 +1,15 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:devomnix/core/preferences/general_preferences.dart';
-import 'package:devomnix/features/backend/backend_error.dart';
 import 'package:devomnix/features/auth/data/auth_repository.dart';
 import 'package:devomnix/features/auth/data/device_id_service.dart';
 import 'package:devomnix/features/auth/data/telegram_link_payload.dart';
+import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+// Провайдер переехал в auth_repository.dart (там же, где сам репозиторий),
+// чтобы backend_api_provider мог им пользоваться без кольца импортов.
+// Реэкспорт оставлен, чтобы не править десяток мест импорта.
+export 'package:devomnix/features/auth/data/auth_repository.dart' show authRepositoryProvider;
 
 /// Результат привязки Telegram: либо успех, либо вопрос к пользователю.
 class LinkOutcome {
@@ -58,54 +62,40 @@ class AuthState {
       );
 }
 
-/// 🔴 `connectTimeout` обязателен. Голый `Dio()` его не имеет: если TCP до
-/// бэкенда уходит в молчание (не «отказано», а чёрная дыра), `await` не
-/// вернётся и исключения не будет — `sendTimeout`/`receiveTimeout` на этой
-/// стадии ещё не работают. Экран просто зависал без ошибки.
-final authRepositoryProvider = Provider<AuthRepository>(
-  (_) => AuthRepository(
-    Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
-    )),
-  ),
-);
-
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._ref) : super(const AuthState());
 
   final Ref _ref;
 
   /// Called once on app startup — silently authenticates via device_id.
+  ///
+  /// Сам вход живёт в [BackendSession]: он же повторяет попытку при сбое сети
+  /// и он же общий с обработчиком 401, чтобы на старте не уходило три
+  /// одновременных логина.
   Future<void> init() async {
     state = const AuthState(status: AuthStatus.loading);
-    try {
-      final deviceId = await _ensureDeviceId();
-      // Модель и платформу шлём при каждом входе, а не только при первом:
-      // человек меняет телефон, и запись об устройстве должна успевать.
-      final device = await const DeviceIdService().describe();
-      final repo = _ref.read(authRepositoryProvider);
-      final result = await repo.deviceLogin(
-        deviceId,
-        deviceName: device.name,
-        platform: device.platform,
-      );
-      await _applyResult(result);
+    final result = await _ref.read(backendSessionProvider).login();
+
+    if (result != null) {
       state = AuthState(
         status: AuthStatus.ready,
         promoUsed: result.promoUsed,
         hasActiveSub: result.hasActiveSub,
       );
-    } catch (e) {
-      // Молчать здесь нельзя. Офлайн-режим внешне неотличим от исправной
-      // работы: JWT пустой, public_id пустой, все экраны отдают «ошибка
-      // загрузки» — и ни одной строки о причине. Именно на этом застряла
-      // диагностика «приложение не видит бэкенд».
-      debugPrint('[auth] вход по device_id не удался: ${describeBackendError(e)}');
-      // Allow offline mode — treat as no active sub
-      await _ref.read(Preferences.authCompleted.notifier).update(true);
-      state = const AuthState(status: AuthStatus.ready, hasActiveSub: false);
+      return;
     }
+
+    // Офлайн-режим. 🔴 Статус подписки при этом НЕ обнуляем: сеть недоступна —
+    // это не ответ «подписки нет». Раньше здесь стояло `hasActiveSub: false`,
+    // и первый же неудачный запрос на старте гасил оплаченную подписку до
+    // перезапуска: экран говорил «нет активной подписки», хотя на сервере она
+    // была. Берём последнее, что сервер успел подтвердить.
+    await _ref.read(Preferences.authCompleted.notifier).update(true);
+    state = AuthState(
+      status: AuthStatus.ready,
+      promoUsed: _ref.read(Preferences.promoUsed),
+      hasActiveSub: _ref.read(Preferences.hasActiveSub),
+    );
   }
 
   /// Start phone verification flow.
@@ -203,15 +193,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> _applyResult(AuthResult result) async {
-    await _ref.read(Preferences.jwtToken.notifier).update(result.jwt);
-    await _ref.read(Preferences.authCompleted.notifier).update(true);
-    await _ref.read(Preferences.promoUsed.notifier).update(result.promoUsed);
-    await _ref.read(Preferences.hasActiveSub.notifier).update(result.hasActiveSub);
-    if (result.publicId != null) {
-      await _ref.read(Preferences.publicId.notifier).update('${result.publicId}');
-    }
-  }
+  Future<void> _applyResult(AuthResult result) =>
+      _ref.read(backendSessionProvider).apply(result);
 
   String _extractError(Object e) {
     if (e is DioException) {

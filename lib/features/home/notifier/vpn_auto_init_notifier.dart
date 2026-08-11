@@ -1,5 +1,5 @@
+import 'package:devomnix/core/preferences/general_preferences.dart';
 import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
-import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend/backend_service.dart';
 import 'package:devomnix/features/connection/notifier/connection_notifier.dart';
 import 'package:devomnix/features/profile/data/profile_data_mapper.dart';
@@ -12,16 +12,40 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 const kAutoProfileName = 'DevOmnix VPN';
 
 // ─── Централизованный статус подписки ────────────────────────────────────────
-// Единый источник правды: оба экрана (кнопка и профиль) используют этот provider.
+// Единый источник правды для экранов. Запрос принадлежит [SubscriptionGuard]:
+// у него кеш на 5 минут и склейка параллельных вызовов, поэтому три экрана,
+// открытые подряд, дают один запрос, а не три.
+//
+// 🔴 Ошибку больше НЕ подменяем на `false`. Раньше здесь стоял
+// `catch (_) { return false; }`, и любой обрыв связи экран показывал как
+// «нет активной подписки» — включая случай с активным промокодом VIP.
+// Теперь отказ уходит в AsyncError, и экран печатает настоящую причину.
+/// Сколько экран ждёт ответа, прежде чем показать причину вместо спиннера.
+/// Сам запрос при этом не отменяется — досчитается и разбудит экран через
+/// [accountRevisionProvider].
+const _screenTimeout = Duration(seconds: 12);
+
 final subscriptionStatusProvider = FutureProvider.autoDispose<bool>((ref) async {
-  try {
-    final dio = ref.watch(backendDioProvider);
-    final r = await dio.get('/auth/me');
-    final data = Map<String, dynamic>.from(r.data as Map);
-    return data['has_active_sub'] == true;
-  } catch (_) {
-    return false;
-  }
+  // Токен может приехать позже первой отрисовки (вход на старте повторяет
+  // попытку). Тогда этот провайдер обязан перезапроситься сам, иначе экран
+  // так и останется с ошибкой до перехода туда-обратно.
+  ref.watch(Preferences.jwtToken);
+  ref.watch(accountRevisionProvider);
+  final snapshot = await ref
+      .read(subscriptionGuardProvider.notifier)
+      .fetchMe(timeout: _screenTimeout);
+  return snapshot.hasActiveSub;
+});
+
+/// Полный ответ `/auth/me` для экранов Профиля и «Мой аккаунт».
+final accountInfoProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  ref.watch(Preferences.jwtToken);
+  ref.watch(accountRevisionProvider);
+  final snapshot = await ref
+      .read(subscriptionGuardProvider.notifier)
+      .fetchMe(timeout: _screenTimeout);
+  return snapshot.me;
 });
 
 /// Silently fetches a VLESS config from the backend on first launch
@@ -40,9 +64,11 @@ class VpnAutoInitNotifier extends AsyncNotifier<void> {
       // Точка 1 из трёх: проверка подписки при запуске приложения.
       // Идёт через guard, а не через subscriptionStatusProvider — заодно
       // поднимает часовой опрос и общий кеш на все точки проверки.
-      final hasActiveSub =
+      final check =
           await ref.read(subscriptionGuardProvider.notifier).checkOnStartup();
-      if (!hasActiveSub) return; // нет подписки — молча выходим
+      // Конфиг качать имеет смысл только при подтверждённой подписке.
+      // При `unknown` сети всё равно нет — запрос за конфигом упадёт следом.
+      if (check != SubscriptionCheck.active) return;
 
       await _addAndActivateProfileFromBackend();
     } catch (_) {

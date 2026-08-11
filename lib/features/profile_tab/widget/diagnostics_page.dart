@@ -235,9 +235,17 @@ final _probeProvider = FutureProvider.autoDispose<List<String>>((ref) async {
   }
 
   // 3. Токен устройства: пустой JWT объясняет и 401, и пустой ID в профиле.
-  final jwt = ref.read(Preferences.jwtToken);
+  //    Пустой — сразу пробуем войти прямо здесь и печатаем причину отказа:
+  //    без неё «JWT пусто» ничего не говорит о том, где именно сломалось.
+  final session = ref.read(backendSessionProvider);
+  var jwt = ref.read(Preferences.jwtToken);
+  if (jwt.isEmpty) {
+    await session.login(attempts: 1);
+    jwt = ref.read(Preferences.jwtToken);
+  }
   lines.add(jwt.isEmpty
-      ? '3. JWT — ПУСТО (вход по device_id не прошёл)'
+      ? '3. JWT — ПУСТО. Вход по device_id: '
+          '${session.lastError == null ? 'причина не записана' : describeBackendError(session.lastError!)}'
       : '3. JWT — есть (${jwt.length} симв.)');
   try {
     final r = await ref.read(backendDioProvider).get('/auth/me');

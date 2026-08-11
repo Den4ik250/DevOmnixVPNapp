@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
+import 'package:devomnix/core/preferences/general_preferences.dart';
+import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
 import 'package:devomnix/features/auth/widget/bot_link_launcher.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend/backend_error.dart';
@@ -64,11 +66,16 @@ class _Account {
 }
 
 final _accountProvider = FutureProvider.autoDispose<_Account>((ref) async {
-  final dio = ref.watch(backendDioProvider);
-  final me = await dio.get('/auth/me');
-  final devices = await dio.get('/devices/');
+  // `/auth/me` берём из общего кеша (см. SubscriptionGuard): экран открывается
+  // из Профиля, который только что его запросил, — второй раз ходить незачем.
+  ref.watch(Preferences.jwtToken);
+  ref.watch(accountRevisionProvider);
+  final me = await ref
+      .read(subscriptionGuardProvider.notifier)
+      .fetchMe(timeout: const Duration(seconds: 12));
+  final devices = await ref.read(backendDioProvider).get('/devices/');
   return _Account(
-    me: Map<String, dynamic>.from(me.data as Map),
+    me: me.me,
     devices: (devices.data as List)
         .map((raw) => _Device.fromJson(Map<String, dynamic>.from(raw as Map)))
         .toList(),

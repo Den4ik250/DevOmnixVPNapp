@@ -1,6 +1,23 @@
 import 'package:dio/dio.dart';
 import 'package:devomnix/core/model/constants.dart';
 import 'package:devomnix/features/auth/data/telegram_link_payload.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+/// 🔴 `connectTimeout` обязателен. Голый `Dio()` его не имеет: если TCP до
+/// бэкенда уходит в молчание (не «отказано», а чёрная дыра), `await` не
+/// вернётся и исключения не будет — `sendTimeout`/`receiveTimeout` на этой
+/// стадии ещё не работают. Экран просто зависал без ошибки.
+///
+/// Свой Dio, а не общий `backendDioProvider`: общий на 401 сам идёт логиниться,
+/// и вход через него закольцевался бы сам на себя.
+final authRepositoryProvider = Provider<AuthRepository>(
+  (_) => AuthRepository(
+    Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 7),
+      receiveTimeout: const Duration(seconds: 10),
+    )),
+  ),
+);
 
 class AuthResult {
   const AuthResult({
