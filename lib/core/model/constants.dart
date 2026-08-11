@@ -32,6 +32,16 @@ abstract class Constants {
   //
   // TODO: перевести на https://api.devomnix.com после настройки DNS и TLS.
   static const backendBaseUrl = "http://78.17.100.87";
+
+  /// Имя профиля, который приложение скачивает у бэкенда само.
+  ///
+  /// По нему авто-профиль отличается от серверов, которые человек добавил
+  /// вручную своей vless-строкой. Разница принципиальная: подписка даёт доступ
+  /// к НАШЕМУ серверу, а к своему человек ходит без нашего разрешения.
+  ///
+  /// Лежит здесь, а не рядом с `VpnAutoInitNotifier`, чтобы на константу мог
+  /// сослаться и `SubscriptionGuard`, не заводя кольцо импортов.
+  static const autoProfileName = "DevOmnix VPN";
 }
 
 const kAnimationDuration = Duration(milliseconds: 250);

@@ -1,3 +1,4 @@
+import 'package:devomnix/core/model/constants.dart';
 import 'package:devomnix/core/preferences/general_preferences.dart';
 import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
 import 'package:devomnix/features/backend/backend_service.dart';
@@ -9,7 +10,9 @@ import 'package:devomnix/features/profile/notifier/active_profile_notifier.dart'
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Стабильное имя авто-профиля (от бэкенда) — отличает его от ручных серверов.
-const kAutoProfileName = 'DevOmnix VPN';
+/// Само значение живёт в [Constants], чтобы `SubscriptionGuard` мог на него
+/// сослаться, не импортируя этот файл в обе стороны.
+const kAutoProfileName = Constants.autoProfileName;
 
 // ─── Централизованный статус подписки ────────────────────────────────────────
 // Единый источник правды для экранов. Запрос принадлежит [SubscriptionGuard]:

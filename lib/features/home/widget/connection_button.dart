@@ -33,7 +33,11 @@ class ConnectionButton extends HookConsumerWidget {
     // выглядело как «кнопка не нажалась»: нажатие уходило в сеть, а картинка
     // не менялась до самого коннекта. Своё состояние занятости закрывает
     // именно этот промежуток и заодно глотает повторные тычки.
-    final busy = useState(false);
+    //
+    // Хранит подпись, а не флаг: писать «Проверка подписки…» там, где её не
+    // проверяют (свой сервер, диалог подтверждения), значило бы врать.
+    final busyLabel = useState<String?>(null);
+    final busy = busyLabel.value != null;
     final activeProxy = ref.watch(activeProxyNotifierProvider);
     final delay = activeProxy.valueOrNull?.urlTestDelay ?? 0;
     final requiresReconnect = ref.watch(configOptionNotifierProvider).valueOrNull;
@@ -62,18 +66,34 @@ class ConnectionButton extends HookConsumerWidget {
           return await ref.read(connectionNotifierProvider.notifier).reconnect(activeProfile);
         },
         AsyncData(value: Disconnected()) || AsyncError() => () async {
-          if (busy.value) return; // повторный тычок, пока идёт проверка
-          busy.value = true;
+          if (busy) return; // повторный тычок, пока идёт проверка
+          busyLabel.value = 'Подключение…';
           try {
             final guard = ref.read(subscriptionGuardProvider.notifier);
-            final hasLocalProfile =
-                ref.read(activeProfileProvider).valueOrNull != null;
+            final activeProfile = ref.read(activeProfileProvider).valueOrNull;
+            final hasLocalProfile = activeProfile != null;
+
+            // 🔴 Свой сервер — подписка ни при чём.
+            //
+            // Подписка даёт доступ к НАШЕМУ серверу. Человек, добавивший свою
+            // vless-строку, платит за неё сам, и спрашивать у нашего бэкенда
+            // разрешения на подключение к чужому серверу незачем — тем более
+            // что бэкенд может быть недоступен, и тогда мы бы блокировали
+            // подключение, к которому не имеем отношения.
+            if (hasLocalProfile && activeProfile.name != kAutoProfileName) {
+              if (await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
+                await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+              }
+              return;
+            }
 
             // Проверка подписки. Ограничена по времени внутри guard'а: пока
             // есть локальный конфиг — пять секунд, дольше человек с пальцем
             // на кнопке ждать не должен.
+            busyLabel.value = 'Проверка подписки…';
             final check =
                 await guard.ensureActiveBeforeConnect(patient: !hasLocalProfile);
+            busyLabel.value = 'Подключение…';
 
             if (check == SubscriptionCheck.inactive) {
               _snack(context, hasLocalProfile
@@ -115,7 +135,7 @@ class ConnectionButton extends HookConsumerWidget {
               await ref.read(connectionNotifierProvider.notifier).toggleConnection();
             }
           } finally {
-            busy.value = false;
+            busyLabel.value = null;
           }
         },
         AsyncData(value: Connected()) => () async {
@@ -129,18 +149,17 @@ class ConnectionButton extends HookConsumerWidget {
         },
         _ => () {},
       },
-      enabled: !busy.value &&
+      enabled: !busy &&
           switch (connectionStatus) {
             AsyncData(value: Connected()) || AsyncData(value: Disconnected()) || AsyncError() => true,
             _ => false,
           },
-      label: busy.value
-          ? 'Проверка подписки…'
-          : requiresReconnect == true && connectionStatus.value == const Connected()
+      label: busyLabel.value ??
+          (requiresReconnect == true && connectionStatus.value == const Connected()
               ? t.connection.reconnect
-              : extStatus.label,
+              : extStatus.label),
       extStatus: extStatus,
-      animated: busy.value || extStatus.isActive,
+      animated: busy || extStatus.isActive,
       secureLabel: secureLabel,
     );
   }

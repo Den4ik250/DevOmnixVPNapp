@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:devomnix/core/model/constants.dart';
 import 'package:devomnix/core/preferences/general_preferences.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend/backend_error.dart';
 import 'package:devomnix/features/connection/notifier/connection_notifier.dart';
+import 'package:devomnix/features/profile/notifier/active_profile_notifier.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -80,18 +82,27 @@ class SubscriptionGuard extends Notifier<bool> {
     // подписку у отключённого клиента незачем, а забытый таймер жёг бы батарею.
     ref.listen(connectionNotifierProvider, (_, next) {
       final connected = next.valueOrNull?.isConnected ?? false;
-      if (connected) {
-        startPolling();
-        unawaited(_markConnected());
-      } else {
+      if (!connected) {
         stopPolling();
+        return;
       }
+      // 🔴 Сторожим только СВОЙ сервер. Человек, подключившийся своей
+      // vless-строкой, платит за тот сервер сам; отключать его по нашей
+      // подписке — значит рвать соединение, к которому мы не имеем отношения.
+      // Отметить устройство живым всё равно полезно: это его аккаунт.
+      unawaited(_markConnected());
+      if (_isOurServerActive) startPolling();
     });
 
     // Стартовое значение — из прошлого запуска, чтобы UI не мигал «нет подписки»
     // до первого ответа бэкенда.
     return ref.read(Preferences.hasActiveSub);
   }
+
+  /// Активен ли сейчас профиль, который мы выдали сами (а не свой сервер
+  /// пользователя). Подписка сторожит только его.
+  bool get _isOurServerActive =>
+      ref.read(activeProfileProvider).valueOrNull?.name == Constants.autoProfileName;
 
   /// Точка 1: старт приложения.
   Future<SubscriptionCheck> checkOnStartup() => _check(force: true);
