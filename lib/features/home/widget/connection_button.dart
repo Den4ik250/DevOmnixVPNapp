@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -73,66 +74,55 @@ class ConnectionButton extends HookConsumerWidget {
             final activeProfile = ref.read(activeProfileProvider).valueOrNull;
             final hasLocalProfile = activeProfile != null;
 
-            // 🔴 Свой сервер — подписка ни при чём.
+            // 🔴 Конфиг есть локально → подключаемся НЕМЕДЛЕННО.
             //
-            // Подписка даёт доступ к НАШЕМУ серверу. Человек, добавивший свою
-            // vless-строку, платит за неё сам, и спрашивать у нашего бэкенда
-            // разрешения на подключение к чужому серверу незачем — тем более
-            // что бэкенд может быть недоступен, и тогда мы бы блокировали
-            // подключение, к которому не имеем отношения.
-            if (hasLocalProfile && activeProfile.name != kAutoProfileName) {
+            // Проверка подписки перед коннектом (добавлена 03.08.2026) была
+            // единственным, что встало между кнопкой и туннелем: за всё окно
+            // правок в `android/`, `singbox/`, `hiddifycore/` и `connection/`
+            // не изменилось ни строки. Отсюда и «Hiddify подключается к обоим
+            // серверам, а DevOmnix ни к одному» — у Hiddify такой проверки нет.
+            //
+            // Теперь она не блокирующая: подписка проверяется ФОНОМ, и если
+            // сервер явно ответит «подписки нет», guard разорвёт соединение
+            // сам (см. SubscriptionGuard.verifyWhileConnected). Доступ так же
+            // закрывается, но недоступный бэкенд больше не мешает подключиться.
+            if (hasLocalProfile) {
+              final isOurServer = activeProfile.name == kAutoProfileName;
               if (await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
                 await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+                // Свой сервер человека подписка не сторожит вовсе.
+                if (isOurServer) unawaited(guard.verifyWhileConnected());
               }
               return;
             }
 
-            // Проверка подписки. Ограничена по времени внутри guard'а: пока
-            // есть локальный конфиг — пять секунд, дольше человек с пальцем
-            // на кнопке ждать не должен.
+            // Локального конфига нет — без бэкенда подключаться нечем.
+            // Только здесь ожидание сети оправдано.
             busyLabel.value = 'Проверка подписки…';
-            final check =
-                await guard.ensureActiveBeforeConnect(patient: !hasLocalProfile);
+            final check = await guard.ensureActiveBeforeConnect(patient: true);
             busyLabel.value = 'Подключение…';
 
             if (check == SubscriptionCheck.inactive) {
-              _snack(context, hasLocalProfile
-                  ? 'Подписка неактивна. Перейдите в раздел Тарифы.'
-                  : 'Нет активной подписки. Перейдите в раздел Тарифы.');
+              _snack(context, 'Нет активной подписки. Перейдите в раздел Тарифы.');
               return;
             }
-
             if (check == SubscriptionCheck.unknown) {
-              // 🔴 Сервер не ответил — это не повод отбирать доступ.
-              // Локальный конфиг есть → подключаемся, как подключались до
-              // появления проверки. Отзыв подписки при следующей удачной
-              // проверке всё равно сработает.
-              if (!hasLocalProfile) {
-                _snack(
-                  context,
-                  'Сервер не отвечает, а конфигурации ещё нет. '
-                  '${describeBackendError(guard.lastError ?? 'причина неизвестна')}',
-                );
-                return;
-              }
-              _snack(context,
-                  'Сервер не отвечает — подключаюсь по сохранённой конфигурации.');
-            } else if (!hasLocalProfile) {
-              // Подписка подтверждена, но конфига локально нет — качаем.
-              // activateAndConnect ловит ошибку в AsyncValue.guard, поэтому её
-              // надо явно достать из состояния, иначе сбой получения конфига
-              // выглядит как «кнопка не работает».
-              await ref.read(vpnAutoInitProvider.notifier).activateAndConnect();
-              final state = ref.read(vpnAutoInitProvider);
-              if (state is AsyncError) {
-                _snack(context,
-                    'Не удалось получить конфигурацию VPN. ${describeBackendError(state.error)}');
-              }
+              _snack(
+                context,
+                'Сервер не отвечает, а конфигурации ещё нет. '
+                '${describeBackendError(guard.lastError ?? 'причина неизвестна')}',
+              );
               return;
             }
 
-            if (await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
-              await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+            // activateAndConnect ловит ошибку в AsyncValue.guard, поэтому её
+            // надо явно достать из состояния, иначе сбой получения конфига
+            // выглядит как «кнопка не работает».
+            await ref.read(vpnAutoInitProvider.notifier).activateAndConnect();
+            final state = ref.read(vpnAutoInitProvider);
+            if (state is AsyncError) {
+              _snack(context,
+                  'Не удалось получить конфигурацию VPN. ${describeBackendError(state.error)}');
             }
           } finally {
             busyLabel.value = null;

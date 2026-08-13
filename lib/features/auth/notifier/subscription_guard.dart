@@ -119,6 +119,23 @@ class SubscriptionGuard extends Notifier<bool> {
   /// Принудительно перечитать статус, не заставляя вызывающего ждать.
   Future<SubscriptionCheck> refresh() => _check(force: true);
 
+  /// Точка 2 в новом виде: проверка ПОСЛЕ подключения, а не до него.
+  ///
+  /// 🔴 Почему так. Блокирующая проверка перед коннектом делала приложение
+  /// неработоспособным ровно тогда, когда бэкенд недоступен: туннель не
+  /// поднимался, хотя конфиг был на руках и сервер отвечал. Соседний Hiddify
+  /// с тем же ядром и теми же серверами подключался — потому что ничего не
+  /// спрашивал. Проверять надо, но не ценой самого подключения.
+  ///
+  /// Разрываем только по явному `inactive`: сервер ответил и сказал «нет».
+  /// Молчание сети правом отзыва не является.
+  Future<void> verifyWhileConnected() async {
+    if (await _check(force: true) != SubscriptionCheck.inactive) return;
+    if (!_isOurServerActive) return;
+    await ref.read(connectionNotifierProvider.notifier).abortConnection();
+    stopPolling();
+  }
+
   /// Отмечает устройство живым сразу после того, как туннель встал.
   ///
   /// 🔴 Здесь именно повторный вход `/auth/device`, а не `/auth/me`.
