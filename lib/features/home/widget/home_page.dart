@@ -34,6 +34,12 @@ class HomePage extends HookConsumerWidget {
     // Trigger auto-init on mount.
     ref.watch(vpnAutoInitProvider);
 
+    // Имя человека в шапке вместо названия приложения: своё имя он узнаёт
+    // мгновенно, а бренд на главной собственного VPN ничего не сообщает.
+    // Пока имя не загрузилось или не заполнено — остаётся название.
+    final firstName =
+        (ref.watch(accountInfoProvider).valueOrNull?['first_name'] as String?)?.trim();
+
     final mode = ref.watch(Preferences.perAppProxyMode);
     final isProxy = mode == PerAppProxyMode.include;
 
@@ -46,7 +52,11 @@ class HomePage extends HookConsumerWidget {
             Text.rich(
               TextSpan(
                 children: [
-                  TextSpan(text: t.common.appTitle),
+                  TextSpan(
+                    text: (firstName?.isNotEmpty ?? false)
+                        ? firstName!
+                        : t.common.appTitle,
+                  ),
                   const TextSpan(text: ' '),
                   const WidgetSpan(
                     child: AppVersionLabel(),

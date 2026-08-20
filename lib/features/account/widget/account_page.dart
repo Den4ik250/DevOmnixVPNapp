@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
+import 'package:go_router/go_router.dart';
 import 'package:devomnix/core/preferences/general_preferences.dart';
 import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
 import 'package:devomnix/features/auth/widget/bot_link_launcher.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend/backend_error.dart';
+import 'package:devomnix/features/subscription/notifier/active_subscription_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -58,6 +60,21 @@ class _Account {
   String? get phone => me['phone'] as String?;
   String? get telegramUsername => (me['telegram_username'] as String?)?.trim();
   bool get telegramLinked => me['telegram_id'] != null;
+
+  /// Отображаемое имя. Приезжает из Telegram при привязке, дальше человек
+  /// правит его сам — в Telegram имя одно на все сервисы, а здесь это
+  /// подпись в его собственном кабинете.
+  String? get firstName => (me['first_name'] as String?)?.trim();
+
+  /// Промо за полные данные уже получено.
+  bool get promoUsed => me['promo_used'] == true;
+
+  /// Чего не хватает для приветственного промо. Пусто — можно активировать.
+  List<String> get missingForPromo => [
+        if ((firstName ?? '').isEmpty) 'имя',
+        if (!telegramLinked) 'Telegram',
+        if ((phone ?? '').isEmpty) 'номер телефона',
+      ];
   DateTime? get createdAt {
     final raw = me['created_at'];
     if (raw is! String) return null;
@@ -136,6 +153,10 @@ class AccountPage extends ConsumerWidget {
             children: [
               _IdentityCard(account: data).animate().fadeIn(duration: 300.ms),
               const Gap(12),
+              _SubscriptionCard(account: data)
+                  .animate()
+                  .fadeIn(duration: 300.ms, delay: 30.ms),
+              const Gap(12),
               _LinksCard(account: data).animate().fadeIn(duration: 300.ms, delay: 60.ms),
               const Gap(12),
               _DevicesCard(devices: data.devices).animate().fadeIn(duration: 300.ms, delay: 120.ms),
@@ -149,16 +170,17 @@ class AccountPage extends ConsumerWidget {
 
 // ── ID ───────────────────────────────────────────────────────────────────────
 
-class _IdentityCard extends StatelessWidget {
+class _IdentityCard extends ConsumerWidget {
   const _IdentityCard({required this.account});
 
   final _Account account;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final id = account.publicId;
     final createdAt = account.createdAt;
+    final name = account.firstName;
 
     return Card(
       child: Padding(
@@ -166,6 +188,28 @@ class _IdentityCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Имя — первое, что человек видит: оно же стоит в шапке главной.
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    (name?.isNotEmpty ?? false) ? name! : 'Имя не указано',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: (name?.isNotEmpty ?? false)
+                          ? null
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_rounded),
+                  tooltip: 'Изменить имя',
+                  onPressed: () => _editName(context, ref, name),
+                ),
+              ],
+            ),
+            const Gap(12),
             Text('Ваш ID', style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             )),
@@ -212,6 +256,209 @@ class _IdentityCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _editName(BuildContext context, WidgetRef ref, String? current) async {
+    final controller = TextEditingController(text: current ?? '');
+    final value = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ваше имя'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 128,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            hintText: 'Как к вам обращаться',
+            counterText: '',
+          ),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отмена')),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+    if (value == null) return;
+    final name = value.trim();
+    if (name.isEmpty || name == (current ?? '')) return;
+
+    try {
+      await ref.read(backendDioProvider).patch('/auth/name', data: {'first_name': name});
+      // Счётчик, а не invalidate конкретного провайдера: имя показывают три
+      // экрана сразу, и каждый подписан на эту ревизию.
+      ref.read(accountRevisionProvider.notifier).state++;
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Имя сохранено')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось сохранить: ${describeBackendError(e)}')),
+        );
+      }
+    }
+  }
+}
+
+// ── Подписка ─────────────────────────────────────────────────────────────────
+
+/// Тариф, срок и что с ним можно сделать.
+///
+/// 🔴 Данные берутся из `GET /subscriptions/active`, а не из `/auth/me`:
+/// там только булево `has_active_sub`, и экран мог сказать лишь «активна».
+/// Человек не знал ни тарифа, ни даты — а с пробным днём это означало, что
+/// доступ пропадал завтра без предупреждения.
+class _SubscriptionCard extends ConsumerWidget {
+  const _SubscriptionCard({required this.account});
+
+  final _Account account;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final sub = ref.watch(activeSubscriptionProvider);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Подписка', style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            )),
+            const Gap(6),
+            sub.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(
+                  height: 18, width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+              // Отказ сети — не «подписки нет». Пока эти два случая писались
+              // одинаково, обрыв связи выглядел как отобранный доступ.
+              error: (e, _) => Text(
+                'Статус неизвестен: ${describeBackendError(e)}',
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
+              ),
+              data: (data) => _body(context, theme, data),
+            ),
+            ..._promoBlock(context, ref, theme),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context, ThemeData theme, ActiveSubscription? data) {
+    if (data == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Нет активной подписки', style: theme.textTheme.titleMedium
+              ?.copyWith(color: theme.colorScheme.error)),
+          const Gap(12),
+          FilledButton.tonal(
+            onPressed: () => context.goNamed('plans'),
+            child: const Text('Выбрать тариф'),
+          ),
+        ],
+      );
+    }
+
+    final remaining = data.remainingLabel;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          data.planName,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const Gap(2),
+        Text(
+          data.isPermanent
+              ? 'Действует бессрочно'
+              : data.expiresAt == null
+                  ? 'Срок не указан'
+                  : 'До ${DateFormat('dd.MM.yyyy, HH:mm').format(data.expiresAt!.toLocal())}'
+                      '${remaining == null ? '' : ' · $remaining'}',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        if (data.isDeviceTrial) ...[
+          const Gap(6),
+          Text(
+            'Это пробный день нового пользователя — он выдан автоматически '
+            'и не продлевается.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        const Gap(12),
+        FilledButton.tonal(
+          onPressed: () => context.goNamed('plans'),
+          // Бесплатный доступ не продлевают деньгами — предлагаем выбрать тариф.
+          child: Text(data.isFree ? 'Выбрать тариф' : 'Продлить подписку'),
+        ),
+      ],
+    );
+  }
+
+  /// Приветственное промо: 3 дня безлимита за имя + Telegram + телефон.
+  List<Widget> _promoBlock(BuildContext context, WidgetRef ref, ThemeData theme) {
+    if (account.promoUsed) return const [];
+    final missing = account.missingForPromo;
+
+    return [
+      const Divider(height: 24),
+      Text('3 дня безлимита', style: theme.textTheme.titleSmall
+          ?.copyWith(fontWeight: FontWeight.w600)),
+      const Gap(4),
+      Text(
+        missing.isEmpty
+            ? 'Данные заполнены — промо можно получить.'
+            : 'Чтобы получить, укажите: ${missing.join(', ')}.',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+      const Gap(8),
+      FilledButton(
+        // Кнопка не прячется при неполных данных, а гаснет: спрятанную
+        // человек не найдёт и не узнает, что промо вообще существует.
+        onPressed: missing.isEmpty ? () => _activatePromo(context, ref) : null,
+        child: const Text('Получить промо'),
+      ),
+    ];
+  }
+
+  Future<void> _activatePromo(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(backendDioProvider).post('/promo/welcome');
+      ref.read(accountRevisionProvider.notifier).state++;
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Промо активировано: 3 дня безлимита')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(describeBackendError(e))),
+        );
+      }
+    }
   }
 }
 

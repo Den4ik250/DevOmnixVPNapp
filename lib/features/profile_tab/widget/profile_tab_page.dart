@@ -11,6 +11,7 @@ import 'package:devomnix/features/auth/widget/bot_link_launcher.dart';
 import 'package:devomnix/core/router/go_router/go_router_notifier.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend/backend_error.dart';
+import 'package:devomnix/features/subscription/notifier/active_subscription_provider.dart';
 import 'package:devomnix/features/backend_update/model/backend_update_state.dart';
 import 'package:devomnix/features/backend_update/notifier/backend_update_notifier.dart';
 import 'package:devomnix/core/router/bottom_sheets/bottom_sheets_notifier.dart';
@@ -226,7 +227,12 @@ class _AccountHeader extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    me['phone'] != null ? (me['phone'] as String) : 'DevOmnix VPN',
+                    // Имя вперёд телефона: человек узнаёт себя по имени,
+                    // а номер он и так знает. Название приложения в шапке
+                    // собственного профиля не сообщает ничего.
+                    ((me['first_name'] as String?)?.trim().isNotEmpty ?? false)
+                        ? (me['first_name'] as String).trim()
+                        : (me['phone'] as String?) ?? 'DevOmnix VPN',
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   // Публичный ID — его человек называет в поддержке, по нему
@@ -264,8 +270,15 @@ class _AccountHeader extends ConsumerWidget {
                   const Gap(2),
                   // Статус берём из единого provider
                   subStatus.when(
+                    // Активность решает единый provider, а подробности
+                    // (тариф и срок) подтягиваются отдельно и могут ещё
+                    // грузиться — тогда остаётся прежняя общая фраза.
                     data: (isActive) => Text(
-                      isActive ? 'Подписка активна' : 'Нет активной подписки',
+                      !isActive
+                          ? 'Нет активной подписки'
+                          : ref.watch(activeSubscriptionProvider).valueOrNull
+                                  ?.shortLabel ??
+                              'Подписка активна',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: isActive ? Colors.green : theme.colorScheme.error,
                       ),
