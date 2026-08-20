@@ -4,6 +4,6 @@
         <domain includeSubdomains="false">127.0.0.1</domain>
     </domain-config>
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">78.17.100.87</domain>
+        <domain includeSubdomains="false">136.148.216.141</domain>
     </domain-config>
 </network-security-config>
