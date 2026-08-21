@@ -11,6 +11,7 @@ import 'package:devomnix/features/auth/widget/bot_link_launcher.dart';
 import 'package:devomnix/core/router/go_router/go_router_notifier.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend/backend_error.dart';
+import 'package:devomnix/features/subscription/model/traffic_usage.dart';
 import 'package:devomnix/features/subscription/notifier/active_subscription_provider.dart';
 import 'package:devomnix/features/backend_update/model/backend_update_state.dart';
 import 'package:devomnix/features/backend_update/notifier/backend_update_notifier.dart';
@@ -273,16 +274,29 @@ class _AccountHeader extends ConsumerWidget {
                     // Активность решает единый provider, а подробности
                     // (тариф и срок) подтягиваются отдельно и могут ещё
                     // грузиться — тогда остаётся прежняя общая фраза.
-                    data: (isActive) => Text(
-                      !isActive
-                          ? 'Нет активной подписки'
-                          : ref.watch(activeSubscriptionProvider).valueOrNull
-                                  ?.shortLabel ??
-                              'Подписка активна',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: isActive ? Colors.green : theme.colorScheme.error,
-                      ),
-                    ),
+                    data: (isActive) {
+                      // 🔴 Выбранный лимит трафика равносилен отсутствию
+                      // подписки: доступа нет. Пока здесь зелёным горел
+                      // «Пробный день», шапка спорила с карточкой в «Моём
+                      // аккаунте», и верили, естественно, зелёному.
+                      final exceeded =
+                          TrafficUsage.fromJson(me)?.exceeded ?? false;
+                      final ok = isActive && !exceeded;
+                      return Text(
+                        exceeded
+                            ? 'Трафик исчерпан'
+                            : !isActive
+                                ? 'Нет активной подписки'
+                                : ref
+                                        .watch(activeSubscriptionProvider)
+                                        .valueOrNull
+                                        ?.shortLabel ??
+                                    'Подписка активна',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: ok ? Colors.green : theme.colorScheme.error,
+                        ),
+                      );
+                    },
                     loading: () => Text('...', style: theme.textTheme.bodySmall),
                     // 🔴 Отказ сети — это не «нет подписки». Пока здесь стояла
                     // та же фраза, обрыв связи выглядел как отобранная

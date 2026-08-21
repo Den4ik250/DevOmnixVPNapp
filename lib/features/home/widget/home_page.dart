@@ -19,6 +19,7 @@ import 'package:devomnix/features/per_app_proxy/data/app_proxy_data_source.dart'
 import 'package:devomnix/features/per_app_proxy/data/selected_data_provider.dart';
 import 'package:devomnix/features/per_app_proxy/model/per_app_proxy_mode.dart';
 import 'package:devomnix/features/proxy/active/active_proxy_delay_indicator.dart';
+import 'package:devomnix/features/subscription/widget/traffic_exceeded_banner.dart';
 import 'package:devomnix/gen/assets.gen.dart';
 import 'package:devomnix/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -74,6 +75,11 @@ class HomePage extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // ── 1. Трафик исчерпан ─────────────────────────────────────
+              // Выше тумблера и кнопки: причина, по которой они не сработают,
+              // должна попасться на глаза раньше самих кнопок.
+              const TrafficExceededBanner(),
+
               // ── 2. VPN / Proxy toggle ──────────────────────────────────
               if (PlatformUtils.isAndroid)
                 Padding(

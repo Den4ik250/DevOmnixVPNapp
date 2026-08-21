@@ -1,6 +1,7 @@
 import 'package:devomnix/core/preferences/general_preferences.dart';
 import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
+import 'package:devomnix/features/subscription/model/traffic_usage.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -19,6 +20,7 @@ class ActiveSubscription {
     required this.isPermanent,
     this.months = 1,
     this.pricePaid = 0,
+    this.traffic,
   });
 
   final String plan;
@@ -28,6 +30,12 @@ class ActiveSubscription {
   final bool isPermanent;
   final int months;
   final double pricePaid;
+
+  /// Расход трафика по тарифу. `null` — бэкенд этих полей не прислал.
+  final TrafficUsage? traffic;
+
+  /// Лимит выбран: доступ формально есть, а трафика уже нет.
+  bool get isTrafficExceeded => traffic?.exceeded ?? false;
 
   /// Пробный день, который бэкенд выдаёт сам при первом входе с устройства.
   bool get isDeviceTrial => plan == 'device_trial';
@@ -76,6 +84,7 @@ class ActiveSubscription {
       isPermanent: json['is_permanent'] == true,
       months: (json['months'] as num?)?.toInt() ?? 1,
       pricePaid: (json['price_paid'] as num?)?.toDouble() ?? 0,
+      traffic: TrafficUsage.fromJson(json),
     );
   }
 }
@@ -96,4 +105,23 @@ final activeSubscriptionProvider =
   // Ручка отдаёт null, когда активной подписки нет — это не ошибка.
   if (data is! Map) return null;
   return ActiveSubscription.fromJson(Map<String, dynamic>.from(data));
+});
+
+/// Расход трафика для экранов, которым не нужна вся подписка целиком.
+///
+/// Читает тот же кешированный `/auth/me`, что и остальные экраны (владелец
+/// запроса — [SubscriptionGuard]), поэтому баннер на главной не добавляет
+/// ни одного похода в сеть. Если поля приедут только в `/subscriptions/active`,
+/// подхватится оттуда — источник тут не важен, важна цифра.
+final trafficUsageProvider = FutureProvider.autoDispose<TrafficUsage?>((ref) async {
+  ref.watch(Preferences.jwtToken);
+  ref.watch(accountRevisionProvider);
+
+  final fromSub = ref.watch(activeSubscriptionProvider).valueOrNull?.traffic;
+  if (fromSub != null) return fromSub;
+
+  final snapshot = await ref
+      .read(subscriptionGuardProvider.notifier)
+      .fetchMe(timeout: const Duration(seconds: 12));
+  return TrafficUsage.fromJson(snapshot.me);
 });

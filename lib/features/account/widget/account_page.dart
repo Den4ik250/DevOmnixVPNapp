@@ -8,7 +8,9 @@ import 'package:devomnix/features/auth/notifier/subscription_guard.dart';
 import 'package:devomnix/features/auth/widget/bot_link_launcher.dart';
 import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend/backend_error.dart';
+import 'package:devomnix/features/subscription/model/traffic_usage.dart';
 import 'package:devomnix/features/subscription/notifier/active_subscription_provider.dart';
+import 'package:devomnix/features/subscription/widget/traffic_bar.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -68,6 +70,9 @@ class _Account {
 
   /// Промо за полные данные уже получено.
   bool get promoUsed => me['promo_used'] == true;
+
+  /// Расход трафика по тарифу. `null` — бэкенд этих полей не прислал.
+  TrafficUsage? get traffic => TrafficUsage.fromJson(me);
 
   /// Чего не хватает для приветственного промо. Пусто — можно активировать.
   List<String> get missingForPromo => [
@@ -375,15 +380,32 @@ class _SubscriptionCard extends ConsumerWidget {
       );
     }
 
+    // Поля трафика может прислать любая из двух ручек — берём ту, что ответила.
+    final traffic = data.traffic ?? account.traffic;
+    final exceeded = traffic?.exceeded ?? false;
     final remaining = data.remainingLabel;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          data.planName,
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
+        // 🔴 Выбранный лимит — это тот же отобранный доступ, что и истёкший
+        // срок. Пока в заголовке стоял бодрый «Пробный период», человек видел
+        // активную подписку и не понимал, почему VPN не работает.
+        if (exceeded)
+          const TrafficExceededBadge()
+        else
+          Text(
+            data.planName,
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
         const Gap(2),
+        if (exceeded)
+          Text(
+            'Тариф «${data.planName}» — трафик закончился',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         Text(
           data.isPermanent
               ? 'Действует бессрочно'
@@ -395,6 +417,10 @@ class _SubscriptionCard extends ConsumerWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
+        if (traffic != null) ...[
+          const Gap(10),
+          TrafficBar(traffic: traffic),
+        ],
         if (data.isDeviceTrial) ...[
           const Gap(6),
           Text(
@@ -409,7 +435,13 @@ class _SubscriptionCard extends ConsumerWidget {
         FilledButton.tonal(
           onPressed: () => context.goNamed('plans'),
           // Бесплатный доступ не продлевают деньгами — предлагаем выбрать тариф.
-          child: Text(data.isFree ? 'Выбрать тариф' : 'Продлить подписку'),
+          child: Text(
+            exceeded
+                ? 'Обновить тариф'
+                : data.isFree
+                    ? 'Выбрать тариф'
+                    : 'Продлить подписку',
+          ),
         ),
       ],
     );

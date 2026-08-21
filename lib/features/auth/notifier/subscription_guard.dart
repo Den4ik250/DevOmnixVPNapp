@@ -6,6 +6,7 @@ import 'package:devomnix/features/backend/backend_api_provider.dart';
 import 'package:devomnix/features/backend/backend_error.dart';
 import 'package:devomnix/features/connection/notifier/connection_notifier.dart';
 import 'package:devomnix/features/profile/notifier/active_profile_notifier.dart';
+import 'package:devomnix/features/subscription/model/traffic_usage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -37,6 +38,12 @@ class AccountSnapshot {
   final DateTime fetchedAt;
 
   bool get hasActiveSub => me['has_active_sub'] == true;
+
+  /// Расход трафика по тарифу. `null` — бэкенд этих полей не прислал.
+  TrafficUsage? get traffic => TrafficUsage.fromJson(me);
+
+  /// Лимит выбран: подписка ещё числится активной, но качать уже нечего.
+  bool get trafficExceeded => traffic?.exceeded ?? false;
 }
 
 /// Проверка подписки в трёх точках (Авторизация.md) и единственный владелец
